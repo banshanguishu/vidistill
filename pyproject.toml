@@ -1,0 +1,35 @@
+[tool.poetry]
+name = "vidistill"
+version = "0.1.0"
+description = "Web tool: video URL -> AI summary -> Markdown/HTML/PDF"
+authors = ["libo.gou <libo.gou@dreambigcareer.com>"]
+readme = "README.md"
+packages = [{include = "vidistill", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.115"
+uvicorn = {extras = ["standard"], version = "^0.32"}
+jinja2 = "^3.1"
+python-multipart = "^0.0.9"
+python-dotenv = "^1.0"
+yt-dlp = "^2024.11.4"
+openai = "^1.55"
+dashscope = "^1.20"
+"markdown-it-py" = "^3.0"
+weasyprint = "^63"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3"
+pytest-asyncio = "^0.24"
+pytest-mock = "^3.14"
+httpx = "^0.27"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
