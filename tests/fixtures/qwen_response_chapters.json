@@ -1,0 +1,16 @@
+{
+  "chapters": [
+    {
+      "timestamp": 0.0,
+      "title": "开场介绍",
+      "summary": "讲师介绍课程目标。",
+      "bullets": ["讲师背景", "课程结构"]
+    },
+    {
+      "timestamp": 120.0,
+      "title": "简历准备",
+      "summary": "如何写出有针对性的简历。",
+      "bullets": ["关键词匹配", "成就量化"]
+    }
+  ]
+}
