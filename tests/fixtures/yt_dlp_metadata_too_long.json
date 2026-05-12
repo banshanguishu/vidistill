@@ -1,0 +1,8 @@
+{
+  "id": "tooLong",
+  "title": "Three Hour Documentary",
+  "duration": 10800,
+  "webpage_url": "https://example/long",
+  "subtitles": {},
+  "automatic_captions": {"en": [{"url": "x", "ext": "vtt"}]}
+}

@@ -1,0 +1,10 @@
+{
+  "id": "dQw4w9WgXcQ",
+  "title": "Sample YouTube Video",
+  "duration": 213,
+  "webpage_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  "subtitles": {},
+  "automatic_captions": {
+    "en": [{"url": "http://example/sub.vtt", "ext": "vtt"}]
+  }
+}

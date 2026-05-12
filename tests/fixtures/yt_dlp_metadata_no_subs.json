@@ -1,0 +1,8 @@
+{
+  "id": "noSubVideo",
+  "title": "No Subs Available",
+  "duration": 600,
+  "webpage_url": "https://example/no-subs",
+  "subtitles": {},
+  "automatic_captions": {}
+}
