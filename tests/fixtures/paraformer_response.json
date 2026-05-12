@@ -1,0 +1,9 @@
+{
+  "output": {
+    "sentences": [
+      {"begin_time": 0, "end_time": 4500, "text": "欢迎来到本课程"},
+      {"begin_time": 4500, "end_time": 9800, "text": "今天我们讲面试技巧"},
+      {"begin_time": 9800, "end_time": 15300, "text": "首先准备好你的简历"}
+    ]
+  }
+}
