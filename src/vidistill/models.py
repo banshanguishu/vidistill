@@ -52,6 +52,7 @@ class Summary:
 class JobState:
     job_id: str
     url: str
+    video_title: str
     style: Style
     format: Format
     status: JobStatus

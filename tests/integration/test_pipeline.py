@@ -21,10 +21,11 @@ def config(tmp_path):
     return Config(dashscope_api_key="test-key", output_dir=tmp_path)
 
 
-def _seed_job(store: JobStore, job_id="j1", style="chapters", fmt="md"):
+def _seed_job(store: JobStore, job_id="j1", style="chapters", fmt="md", title="Test Video"):
     store.create(JobState(
         job_id=job_id,
         url="https://example/v",
+        video_title=title,
         style=style,
         format=fmt,
         status="pending",

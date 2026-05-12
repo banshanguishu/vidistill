@@ -11,6 +11,7 @@ def _job(job_id="abc"):
     return JobState(
         job_id=job_id,
         url="https://x",
+        video_title="Test",
         style="short",
         format="md",
         status="pending",

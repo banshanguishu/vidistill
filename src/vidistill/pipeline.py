@@ -52,10 +52,12 @@ def process_video(
             store.update(job_id, progress=60)
 
         store.update(job_id, status="summarizing", progress=70)
+        existing = store.get(job_id)
+        title = existing.video_title if existing else url
         summary = llm.summarize(
             segments=segments,
             style=style,
-            video_title=_resolve_title(store, job_id, url),
+            video_title=title,
             video_url=url,
             config=config,
         )
@@ -77,18 +79,6 @@ def process_video(
         store.update(job_id, status="failed", error=f"未预期错误: {e}")
     finally:
         _cleanup_intermediate(job_dir)
-
-
-def _resolve_title(store: JobStore, job_id: str, url: str) -> str:
-    """Pull title from job metadata if present, else fall back to URL.
-
-    PLACEHOLDER: Task 13 will replace this with a direct read of
-    JobState.video_title after that field is added to the dataclass.
-    """
-    job = store.get(job_id)
-    if job and getattr(job, "video_title", None):
-        return job.video_title
-    return url
 
 
 def _cleanup_intermediate(job_dir: Path) -> None:

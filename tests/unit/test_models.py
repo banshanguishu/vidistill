@@ -64,6 +64,7 @@ def test_job_state_defaults():
     job = JobState(
         job_id="abc",
         url="https://x",
+        video_title="Sample",
         style="chapters",
         format="md",
         status="pending",
@@ -75,3 +76,4 @@ def test_job_state_defaults():
     assert job.status == "pending"
     assert job.progress == 0
     assert job.error is None
+    assert job.video_title == "Sample"
