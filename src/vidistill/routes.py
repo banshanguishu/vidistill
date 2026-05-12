@@ -36,7 +36,7 @@ def get_templates() -> Jinja2Templates:
 
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return get_templates().TemplateResponse("index.html", {"request": request})
+    return get_templates().TemplateResponse(request, "index.html")
 
 
 @router.post("/jobs", response_model=CreateJobResponse)

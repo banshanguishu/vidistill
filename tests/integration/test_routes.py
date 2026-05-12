@@ -6,6 +6,19 @@ import pytest
 from fastapi.testclient import TestClient
 
 
+@pytest.fixture(autouse=True)
+def reset_slot():
+    """Reset the singleton store's slot between tests to avoid bleed-over."""
+    from vidistill.main import get_store
+    store = get_store()
+    store.release_slot()
+    yield
+    store.release_slot()
+    # Also clear any jobs to keep tests isolated
+    with store._lock:
+        store._jobs.clear()
+
+
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("DASHSCOPE_API_KEY", "test-key")
@@ -53,9 +66,14 @@ def test_post_jobs_returns_job_id_and_queues_task(client):
 
 
 def test_post_jobs_rejects_when_slot_busy(client):
+    from vidistill.main import get_store
     from vidistill.models import VideoMetadata
 
     meta = VideoMetadata(title="X", duration=100, has_subtitle=True, url="https://x")
+    # TestClient runs background tasks synchronously before returning, so
+    # the slot is released by _runner's finally block before r2 is sent.
+    # We re-acquire the slot manually to simulate a still-running job.
+    store = get_store()
     with (
         patch("vidistill.routes.video.fetch_metadata", return_value=meta),
         patch("vidistill.routes.process_video"),
@@ -63,7 +81,9 @@ def test_post_jobs_rejects_when_slot_busy(client):
         # first submit — succeeds and busies the slot
         r1 = client.post("/jobs", json={"url": "https://x", "style": "short", "format": "md"})
         assert r1.status_code == 200
-        # second submit — rejected
+        # Re-acquire slot (background task released it synchronously in TestClient)
+        store.try_acquire_slot()
+        # second submit — rejected because slot is busy
         r2 = client.post("/jobs", json={"url": "https://x", "style": "short", "format": "md"})
     assert r2.status_code == 409
     assert "正在处理" in r2.json()["detail"] or "busy" in r2.json()["detail"].lower()
