@@ -3,7 +3,7 @@ from datetime import datetime
 
 import pytest
 
-from vidistill.jobs import JobStore, SingleSlotBusyError
+from vidistill.jobs import JobStore
 from vidistill.models import JobState
 
 
@@ -68,13 +68,14 @@ def test_concurrent_updates_are_safe():
     assert final.progress in (10, 50, 90)
 
 
-def test_single_slot_acquire_and_release():
+def test_try_acquire_slot_returns_true_first_then_false():
     store = JobStore()
-    with store.acquire_slot():
-        with pytest.raises(SingleSlotBusyError):
-            with store.acquire_slot():
-                pass
+    assert store.try_acquire_slot() is True
+    assert store.try_acquire_slot() is False
 
-    # after release, can acquire again
-    with store.acquire_slot():
-        pass
+
+def test_release_slot_allows_reacquire():
+    store = JobStore()
+    store.try_acquire_slot()
+    store.release_slot()
+    assert store.try_acquire_slot() is True
