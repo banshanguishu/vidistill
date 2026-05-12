@@ -1,0 +1,29 @@
+import os
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+@dataclass(frozen=True)
+class Config:
+    dashscope_api_key: str
+    dashscope_compatible_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    qwen_model: str = "qwen-plus"
+    paraformer_model: str = "paraformer-v2"
+    output_dir: Path = field(default_factory=lambda: Path("/tmp/vidistill"))
+    max_video_duration_seconds: int = 1800
+    pipeline_timeout_seconds: int = 1800
+    min_free_disk_mb: int = 500
+
+
+def load_config() -> Config:
+    api_key = os.environ.get("DASHSCOPE_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "DASHSCOPE_API_KEY environment variable is required. "
+            "Copy .env.example to .env and fill it in."
+        )
+    return Config(dashscope_api_key=api_key)
