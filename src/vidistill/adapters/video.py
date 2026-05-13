@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -77,13 +78,20 @@ def _parse_vtt(path: Path) -> str:
 
 
 def download_audio(url: str, work_dir: Path) -> Path:
-    """Download audio-only stream and extract as MP3."""
+    """Download audio-only stream, extract as MP3, then resample to 16kHz mono.
+
+    Two-step process:
+    1. yt-dlp downloads + extracts mp3 (any sample rate, often stereo)
+    2. We call ffmpeg explicitly to produce 16kHz mono mp3 required by
+       paraformer-realtime-v2. yt-dlp's postprocessor_args is unreliable
+       across versions, so we do this ourselves.
+    """
     work_dir.mkdir(parents=True, exist_ok=True)
     opts = {
         "quiet": True,
         "no_warnings": True,
         "format": "bestaudio/best",
-        "outtmpl": str(work_dir / "audio.%(ext)s"),
+        "outtmpl": str(work_dir / "audio_raw.%(ext)s"),
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -91,10 +99,6 @@ def download_audio(url: str, work_dir: Path) -> Path:
                 "preferredquality": "128",
             }
         ],
-        # Resample to 16kHz mono — required by paraformer-realtime-v2
-        "postprocessor_args": {
-            "ffmpegextractaudio": ["-ac", "1", "-ar", "16000"],
-        },
     }
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
@@ -102,14 +106,48 @@ def download_audio(url: str, work_dir: Path) -> Path:
     except DownloadError as e:
         raise VideoFetchError(f"音频下载失败：{e}") from e
 
+    raw_path: Optional[Path] = None
     downloads = info.get("requested_downloads") or []
     for d in downloads:
         fp = d.get("filepath")
         if fp and Path(fp).exists():
-            return Path(fp)
+            raw_path = Path(fp)
+            break
+    if raw_path is None:
+        for candidate in work_dir.glob("audio_raw.*"):
+            raw_path = candidate
+            break
+    if raw_path is None:
+        raise VideoFetchError("音频文件下载后未找到")
 
-    # Fallback: scan work_dir
-    for candidate in work_dir.glob("audio.mp3"):
-        return candidate
+    resampled = work_dir / "audio.mp3"
+    _resample_to_16k_mono(raw_path, resampled)
 
-    raise VideoFetchError("音频文件下载后未找到")
+    try:
+        if raw_path != resampled:
+            raw_path.unlink()
+    except OSError:
+        pass
+
+    return resampled
+
+
+def _resample_to_16k_mono(input_path: Path, output_path: Path) -> None:
+    """Run ffmpeg to produce a 16kHz mono mp3. Isolated so tests can patch it."""
+    try:
+        subprocess.run(
+            [
+                "ffmpeg", "-y", "-loglevel", "error",
+                "-i", str(input_path),
+                "-ac", "1", "-ar", "16000",
+                "-acodec", "libmp3lame", "-b:a", "64k",
+                str(output_path),
+            ],
+            check=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError as e:
+        stderr = e.stderr.decode("utf-8", errors="replace") if e.stderr else ""
+        raise VideoFetchError(f"音频重采样失败：{stderr}") from e
+    except FileNotFoundError as e:
+        raise VideoFetchError("ffmpeg 未安装或不在 PATH 中") from e

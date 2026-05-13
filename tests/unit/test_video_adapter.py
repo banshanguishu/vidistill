@@ -88,17 +88,25 @@ def test_fetch_subtitle_returns_none_when_no_subs(tmp_path):
 
 
 def test_download_audio_returns_mp3_path(tmp_path):
+    raw = tmp_path / "audio_raw.mp3"
+    raw.write_bytes(b"\xff\xfb\x10\x00")  # fake mp3 header
     expected = tmp_path / "audio.mp3"
-    expected.write_bytes(b"\xff\xfb\x10\x00")  # fake mp3 header
 
     fake_ydl = MagicMock()
     fake_ydl.__enter__.return_value.extract_info.return_value = {
         "title": "X",
-        "requested_downloads": [{"filepath": str(expected)}],
+        "requested_downloads": [{"filepath": str(raw)}],
     }
 
-    with patch("vidistill.adapters.video.yt_dlp.YoutubeDL", return_value=fake_ydl):
+    def fake_resample(in_path, out_path):
+        out_path.write_bytes(b"resampled-mp3-bytes")
+
+    with (
+        patch("vidistill.adapters.video.yt_dlp.YoutubeDL", return_value=fake_ydl),
+        patch("vidistill.adapters.video._resample_to_16k_mono", side_effect=fake_resample),
+    ):
         path = download_audio("https://example/x", tmp_path)
 
     assert path == expected
     assert path.exists()
+    assert not raw.exists()  # raw file should have been cleaned up
