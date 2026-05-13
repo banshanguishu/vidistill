@@ -36,8 +36,15 @@
   .status-text { margin-top: .5rem; color: #555; font-size: .9rem; }
   .error { color: #c62828; background: #fee; border: 1px solid #fcc; padding: .8rem 1rem; border-radius: 6px; margin-top: 1rem; }
   .success { color: #2e7d32; background: #efe; border: 1px solid #cec; padding: .8rem 1rem; border-radius: 6px; margin-top: 1rem; }
-  a.download { display: inline-block; margin-top: .6rem; padding: .6rem 1rem; background: #2e7d32; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; }
+  .download-row { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: .8rem; }
+  a.download, button.download-disabled {
+    flex: 1 1 0; min-width: 140px; padding: .6rem 1rem; text-align: center;
+    text-decoration: none; border-radius: 6px; font-weight: 600; cursor: pointer;
+    border: none;
+  }
+  a.download { background: #2e7d32; color: white; }
   a.download:hover { background: #246627; }
+  button.download-disabled { background: #ccc; color: #666; cursor: not-allowed; }
   button.retry { margin-top: 1rem; padding: .5rem 1rem; background: #555; color: white; border: none; border-radius: 6px; cursor: pointer; }
 </style>
 </head>
@@ -69,13 +76,6 @@
         </label>
       </div>
 
-      <label for="format">输出格式</label>
-      <select id="format" x-model="format">
-        <option value="md">Markdown (.md)</option>
-        <option value="html">HTML (.html)</option>
-        <option value="pdf">PDF (.pdf)</option>
-      </select>
-
       <button class="primary" @click="submit()" :disabled="phase === 'submitting' || !url">
         <span x-show="phase !== 'submitting'">开始生成</span>
         <span x-show="phase === 'submitting'">提交中...</span>
@@ -102,7 +102,16 @@
     <div>
       <div class="success">总结完成！</div>
       <div><strong x-text="videoTitle"></strong></div>
-      <a class="download" :href="`/jobs/${jobId}/download`">下载 <span x-text="format.toUpperCase()"></span> 文件</a>
+      <div class="download-row">
+        <a class="download" :href="`/jobs/${jobId}/download/md`">下载 Markdown</a>
+        <a class="download" :href="`/jobs/${jobId}/download/html`">下载 HTML</a>
+        <template x-if="availableFormats.includes('pdf')">
+          <a class="download" :href="`/jobs/${jobId}/download/pdf`">下载 PDF</a>
+        </template>
+        <template x-if="!availableFormats.includes('pdf')">
+          <button class="download-disabled" disabled title="PDF 需在服务器环境（含 GTK/字体库）生成；本地 Windows 环境无法生成。Docker 部署后可用。">下载 PDF（不可用）</button>
+        </template>
+      </div>
       <br>
       <button class="retry" @click="reset()">再来一个</button>
     </div>
@@ -124,7 +133,7 @@ function vidistillApp() {
     phase: 'idle',
     url: '',
     style: 'chapters',
-    format: 'md',
+    availableFormats: [],
     jobId: null,
     progress: 0,
     status: 'pending',
@@ -139,7 +148,7 @@ function vidistillApp() {
         const resp = await fetch('/jobs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: this.url, style: this.style, format: this.format }),
+          body: JSON.stringify({ url: this.url, style: this.style }),
         });
         if (!resp.ok) {
           const err = await resp.json().catch(() => ({ detail: '提交失败' }));
@@ -170,6 +179,7 @@ function vidistillApp() {
         this.status = data.status;
         this.progress = data.progress;
         this.videoTitle = data.video_title || '';
+        this.availableFormats = data.available_formats || [];
         if (data.status === 'done') {
           clearInterval(this.pollTimer);
           this.phase = 'ready_to_download';
@@ -207,6 +217,7 @@ function vidistillApp() {
       this.progress = 0;
       this.errorMessage = '';
       this.videoTitle = '';
+      this.availableFormats = [];
     },
   }
 }

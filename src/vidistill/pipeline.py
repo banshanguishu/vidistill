@@ -5,7 +5,7 @@ from vidistill.adapters import asr, llm, video
 from vidistill.config import Config
 from vidistill.exceptions import VidistillError
 from vidistill.jobs import JobStore
-from vidistill.models import Format, Style, TranscriptSegment
+from vidistill.models import Style, TranscriptSegment
 from vidistill.renderers import html as html_renderer
 from vidistill.renderers import markdown as md_renderer
 
@@ -30,7 +30,6 @@ def process_video(
     job_id: str,
     url: str,
     style: Style,
-    fmt: Format,
     store: JobStore,
     config: Config,
 ) -> None:
@@ -64,14 +63,25 @@ def process_video(
         store.update(job_id, progress=90)
 
         store.update(job_id, status="rendering", progress=95)
-        render = _get_renderer(fmt)
-        out_path = render(summary, job_dir)
+        output_paths: dict[str, str | None] = {}
+
+        # md and html are mandatory — failures here fail the task
+        for fmt_name in ("md", "html"):
+            render = _get_renderer(fmt_name)
+            output_paths[fmt_name] = str(render(summary, job_dir))
+
+        # pdf is best-effort: missing GTK runtime on Windows shouldn't fail the job
+        try:
+            render = _get_renderer("pdf")
+            output_paths["pdf"] = str(render(summary, job_dir))
+        except Exception:  # noqa: BLE001
+            output_paths["pdf"] = None
 
         store.update(
             job_id,
             status="done",
             progress=100,
-            output_path=str(out_path),
+            output_paths=output_paths,
         )
     except VidistillError as e:
         store.update(job_id, status="failed", error=str(e))

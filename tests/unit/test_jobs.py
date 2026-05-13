@@ -13,11 +13,9 @@ def _job(job_id="abc"):
         url="https://x",
         video_title="Test",
         style="short",
-        format="md",
         status="pending",
         progress=0,
         error=None,
-        output_path=None,
         created_at=datetime.now(),
     )
 

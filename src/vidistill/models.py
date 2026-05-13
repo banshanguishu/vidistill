@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal, Optional
 
@@ -54,9 +54,8 @@ class JobState:
     url: str
     video_title: str
     style: Style
-    format: Format
     status: JobStatus
     progress: int
     error: Optional[str]
-    output_path: Optional[str]
     created_at: datetime
+    output_paths: dict[str, Optional[str]] = field(default_factory=dict)

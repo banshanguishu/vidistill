@@ -11,7 +11,7 @@ from vidistill.adapters import video
 from vidistill.config import Config
 from vidistill.exceptions import VideoFetchError
 from vidistill.jobs import JobStore
-from vidistill.models import Format, JobState, Style
+from vidistill.models import JobState, Style
 from vidistill.pipeline import process_video
 from vidistill.renderers.markdown import sanitize_filename
 
@@ -22,7 +22,6 @@ router = APIRouter()
 class CreateJobRequest(BaseModel):
     url: HttpUrl
     style: Style = Field(default="chapters")
-    format: Format = Field(default="md")
 
 
 class CreateJobResponse(BaseModel):
@@ -69,11 +68,10 @@ def create_job(
         url=str(req.url),
         video_title=meta.title,
         style=req.style,
-        format=req.format,
         status="pending",
         progress=0,
         error=None,
-        output_path=None,
+        output_paths={},
         created_at=datetime.now(),
     ))
 
@@ -83,7 +81,6 @@ def create_job(
                 job_id=job_id,
                 url=str(req.url),
                 style=req.style,
-                fmt=req.format,
                 store=store,
                 config=config,
             )
@@ -100,27 +97,32 @@ def get_job(job_id: str, request: Request):
     job = store.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="任务不存在")
+    available_formats = [fmt for fmt, path in job.output_paths.items() if path]
     return {
         "job_id": job.job_id,
         "status": job.status,
         "progress": job.progress,
         "error": job.error,
         "video_title": job.video_title,
+        "available_formats": available_formats,
     }
 
 
-@router.get("/jobs/{job_id}/download")
-def download(job_id: str, request: Request):
+@router.get("/jobs/{job_id}/download/{fmt}")
+def download(job_id: str, fmt: str, request: Request):
+    if fmt not in ("md", "html", "pdf"):
+        raise HTTPException(status_code=400, detail="不支持的格式")
     store: JobStore = request.app.state.store
     job = store.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="任务不存在")
-    if job.status != "done" or not job.output_path:
+    if job.status != "done":
         raise HTTPException(status_code=409, detail=f"任务状态：{job.status}，文件尚未就绪")
-
-    path = Path(job.output_path)
+    path_str = job.output_paths.get(fmt)
+    if not path_str:
+        raise HTTPException(status_code=404, detail=f"该任务未生成 {fmt} 格式（PDF 可能因环境缺失字体库未生成）")
+    path = Path(path_str)
     if not path.exists():
         raise HTTPException(status_code=404, detail="文件已失效，请重新提交任务")
-
     filename = sanitize_filename(job.video_title) + path.suffix
     return FileResponse(path=str(path), filename=filename)

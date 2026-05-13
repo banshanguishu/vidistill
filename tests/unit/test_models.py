@@ -66,14 +66,13 @@ def test_job_state_defaults():
         url="https://x",
         video_title="Sample",
         style="chapters",
-        format="md",
         status="pending",
         progress=0,
         error=None,
-        output_path=None,
         created_at=now,
     )
     assert job.status == "pending"
     assert job.progress == 0
     assert job.error is None
     assert job.video_title == "Sample"
+    assert job.output_paths == {}
