@@ -141,6 +141,19 @@ function vidistillApp() {
     errorMessage: '',
     pollTimer: null,
 
+    init() {
+      // Warn the user before closing tab/window while a job is in progress.
+      // Browsers (Chrome/Edge/Firefox) ignore custom message text for anti-phishing;
+      // they show their own generic confirmation. Setting returnValue triggers it.
+      window.addEventListener('beforeunload', (e) => {
+        if (this.phase === 'submitting' || this.phase === 'polling') {
+          e.preventDefault();
+          e.returnValue = '';
+          return '';
+        }
+      });
+    },
+
     async submit() {
       this.phase = 'submitting';
       this.errorMessage = '';
