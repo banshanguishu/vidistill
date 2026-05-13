@@ -1,3 +1,5 @@
+import logging
+import time
 from pathlib import Path
 from typing import Callable
 
@@ -8,6 +10,8 @@ from vidistill.jobs import JobStore
 from vidistill.models import Style, TranscriptSegment
 from vidistill.renderers import html as html_renderer
 from vidistill.renderers import markdown as md_renderer
+
+logger = logging.getLogger(__name__)
 
 
 def _get_renderer(fmt: str) -> Callable:
@@ -36,23 +40,43 @@ def process_video(
     """Run the full pipeline and update job state at each phase."""
     job_dir = config.output_dir / job_id
     job_dir.mkdir(parents=True, exist_ok=True)
+    started = time.monotonic()
+    logger.info("[job=%s] pipeline START style=%s url=%s", job_id, style, url)
 
     try:
         store.update(job_id, status="fetching", progress=10)
 
+        logger.info("[job=%s] STEP=fetch_subtitle url=%s", job_id, url)
         subtitle = video.fetch_subtitle(url, job_dir)
         if subtitle:
+            logger.info("[job=%s] subtitle FOUND chars=%d (skip ASR)", job_id, len(subtitle))
             segments = [TranscriptSegment(start=0.0, end=0.0, text=subtitle)]
             store.update(job_id, progress=50)
         else:
+            logger.info("[job=%s] subtitle NOT FOUND, falling back to ASR", job_id)
+            logger.info("[job=%s] STEP=download_audio url=%s", job_id, url)
             audio_path = video.download_audio(url, job_dir)
+            audio_size = audio_path.stat().st_size if audio_path.exists() else 0
+            logger.info("[job=%s] audio downloaded path=%s size_bytes=%d", job_id, audio_path, audio_size)
+
             store.update(job_id, status="transcribing", progress=30)
+            logger.info("[job=%s] STEP=transcribe model=%s", job_id, config.paraformer_model)
+            asr_started = time.monotonic()
             segments = asr.transcribe(audio_path, config)
+            logger.info(
+                "[job=%s] transcribe DONE segments=%d duration=%.1fs",
+                job_id, len(segments), time.monotonic() - asr_started,
+            )
             store.update(job_id, progress=60)
 
         store.update(job_id, status="summarizing", progress=70)
         existing = store.get(job_id)
         title = existing.video_title if existing else url
+        logger.info(
+            "[job=%s] STEP=summarize style=%s segments=%d model=%s title=%r",
+            job_id, style, len(segments), config.qwen_model, title,
+        )
+        llm_started = time.monotonic()
         summary = llm.summarize(
             segments=segments,
             style=style,
@@ -60,9 +84,14 @@ def process_video(
             video_url=url,
             config=config,
         )
+        logger.info(
+            "[job=%s] summarize DONE duration=%.1fs",
+            job_id, time.monotonic() - llm_started,
+        )
         store.update(job_id, progress=90)
 
         store.update(job_id, status="rendering", progress=95)
+        logger.info("[job=%s] STEP=render formats=md,html,pdf", job_id)
         output_paths: dict[str, str | None] = {}
 
         # md and html are mandatory — failures here fail the task
@@ -74,8 +103,18 @@ def process_video(
         try:
             render = _get_renderer("pdf")
             output_paths["pdf"] = str(render(summary, job_dir))
-        except Exception:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
+            logger.warning(
+                "[job=%s] PDF rendering SKIPPED (best-effort): %s: %s",
+                job_id, type(e).__name__, e,
+            )
             output_paths["pdf"] = None
+
+        rendered_formats = [fmt for fmt, p in output_paths.items() if p]
+        logger.info(
+            "[job=%s] render DONE formats=%s (pdf=%s)",
+            job_id, rendered_formats, "ok" if output_paths.get("pdf") else "skipped",
+        )
 
         store.update(
             job_id,
@@ -83,9 +122,18 @@ def process_video(
             progress=100,
             output_paths=output_paths,
         )
+        logger.info(
+            "[job=%s] pipeline DONE total_duration=%.1fs",
+            job_id, time.monotonic() - started,
+        )
     except VidistillError as e:
+        logger.error(
+            "[job=%s] pipeline FAILED type=%s message=%s",
+            job_id, type(e).__name__, e, exc_info=True,
+        )
         store.update(job_id, status="failed", error=str(e))
     except Exception as e:  # noqa: BLE001
+        logger.exception("[job=%s] pipeline UNEXPECTED ERROR", job_id)
         store.update(job_id, status="failed", error=f"未预期错误: {e}")
     finally:
         _cleanup_intermediate(job_dir)

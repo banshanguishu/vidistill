@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +16,8 @@ from vidistill.models import JobState, Style
 from vidistill.pipeline import process_video
 from vidistill.renderers.markdown import sanitize_filename
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -50,16 +53,22 @@ def create_job(
     try:
         meta = video.fetch_metadata(str(req.url))
     except VideoFetchError as e:
+        logger.warning("POST /jobs REJECT url=%s reason=fetch_metadata_failed error=%s", req.url, e)
         raise HTTPException(status_code=422, detail=str(e))
 
     if meta.duration > config.max_video_duration_seconds:
         minutes = meta.duration // 60
+        logger.warning(
+            "POST /jobs REJECT url=%s reason=too_long duration_seconds=%d",
+            req.url, meta.duration,
+        )
         raise HTTPException(
             status_code=422,
             detail=f"视频时长 {minutes} 分钟，超过 30 分钟上限",
         )
 
     if not store.try_acquire_slot():
+        logger.warning("POST /jobs REJECT url=%s reason=slot_busy", req.url)
         raise HTTPException(status_code=409, detail="另一个任务正在处理中，请稍后再试")
 
     job_id = uuid.uuid4().hex[:12]
@@ -74,6 +83,10 @@ def create_job(
         output_paths={},
         created_at=datetime.now(),
     ))
+    logger.info(
+        "POST /jobs ACCEPT job_id=%s title=%r duration_seconds=%d style=%s",
+        job_id, meta.title, meta.duration, req.style,
+    )
 
     def _runner():
         try:

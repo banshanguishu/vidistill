@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from vidistill.config import Config, load_config
 from vidistill.jobs import JobStore
+from vidistill.logging_setup import setup_logging
 from vidistill.routes import router
 
 
@@ -32,6 +33,8 @@ def build_app(config: Optional[Config] = None, output_dir: Optional[Path] = None
             min_free_disk_mb=config.min_free_disk_mb,
         )
         config.output_dir.mkdir(parents=True, exist_ok=True)
+
+    setup_logging(config.output_dir)
 
     app = FastAPI(title="vidistill")
     app.state.store = _GLOBAL_STORE
