@@ -91,6 +91,10 @@ def download_audio(url: str, work_dir: Path) -> Path:
                 "preferredquality": "128",
             }
         ],
+        # Resample to 16kHz mono — required by paraformer-realtime-v2
+        "postprocessor_args": {
+            "ffmpegextractaudio": ["-ac", "1", "-ar", "16000"],
+        },
     }
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:

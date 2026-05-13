@@ -1,9 +1,8 @@
-import time
 from pathlib import Path
 from typing import Any
 
 import dashscope
-from dashscope.audio.asr import Transcription
+from dashscope.audio.asr import Recognition
 
 from vidistill.config import Config
 from vidistill.exceptions import ASRError
@@ -11,11 +10,10 @@ from vidistill.models import TranscriptSegment
 
 
 def transcribe(audio_path: Path, config: Config) -> list[TranscriptSegment]:
-    """Transcribe an audio file using Aliyun Bailian Paraformer.
+    """Transcribe an audio file using Aliyun Bailian Paraformer realtime API.
 
-    Paraformer's batch (Transcription) API requires the audio to be reachable
-    via a public URL. For our single-server use case we use the realtime API
-    via the SDK helper, which accepts a local file path.
+    Uses the realtime model (paraformer-realtime-v2) which accepts local
+    file paths directly. The batch model would require a public HTTPS URL.
     """
     if not audio_path.exists():
         raise ASRError(f"音频文件不存在: {audio_path}")
@@ -49,28 +47,39 @@ def transcribe(audio_path: Path, config: Config) -> list[TranscriptSegment]:
 
 
 def _call_paraformer(audio_path: Path, config: Config) -> dict[str, Any]:
-    """Invoke Paraformer. Isolated so tests can patch it.
+    """Invoke Paraformer realtime via DashScope SDK with a local file.
 
-    Implementation note: this uses dashscope.audio.asr.Transcription.async_call
-    with the local file path. The dashscope SDK uploads the file and polls
-    until the job completes. Returns the final response dict.
+    The Recognition class streams the local file in chunks; the server
+    returns aggregated sentences via result.get_sentence().
     """
     dashscope.api_key = config.dashscope_api_key
 
-    task = Transcription.async_call(
+    recognition = Recognition(
         model=config.paraformer_model,
-        file_urls=[f"file://{audio_path.resolve()}"],
+        format="mp3",
+        sample_rate=16000,
+        callback=None,
     )
-    # Poll until completion
-    deadline = time.time() + 25 * 60  # 25 min safety bound
-    while time.time() < deadline:
-        result = Transcription.fetch(task=task)
-        status = result.output.task_status if hasattr(result, "output") else None
-        if status in ("SUCCEEDED", "FAILED"):
-            if status == "FAILED":
-                raise ASRError(f"Paraformer task failed: {result.output}")
-            # SDK returns a Response object; coerce to dict
-            return {"output": {"sentences": result.output.sentences or []}}
-        time.sleep(5)
+    result = recognition.call(str(audio_path))
 
-    raise ASRError("Paraformer 转写超时（>25 分钟）")
+    status_code = getattr(result, "status_code", None)
+    if status_code is not None and status_code != 200:
+        msg = getattr(result, "message", "unknown")
+        raise ASRError(f"Paraformer 调用失败 ({status_code}): {msg}")
+
+    raw_sentences = result.get_sentence() if hasattr(result, "get_sentence") else []
+    if not raw_sentences:
+        return {"output": {"sentences": []}}
+
+    return {
+        "output": {
+            "sentences": [
+                {
+                    "begin_time": s.get("begin_time", 0) if isinstance(s, dict) else 0,
+                    "end_time": s.get("end_time", 0) if isinstance(s, dict) else 0,
+                    "text": s.get("text", "") if isinstance(s, dict) else "",
+                }
+                for s in raw_sentences
+            ]
+        }
+    }

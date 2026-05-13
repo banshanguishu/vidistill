@@ -15,7 +15,7 @@ def test_load_config_uses_default_values(monkeypatch):
     monkeypatch.setenv("DASHSCOPE_API_KEY", "sk-test-123")
     config = load_config()
     assert config.qwen_model == "qwen-plus"
-    assert config.paraformer_model == "paraformer-v2"
+    assert config.paraformer_model == "paraformer-realtime-v2"
     assert config.max_video_duration_seconds == 1800
     assert config.pipeline_timeout_seconds == 1800
     assert config.min_free_disk_mb == 500
