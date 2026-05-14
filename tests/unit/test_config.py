@@ -26,3 +26,18 @@ def test_load_config_raises_when_api_key_missing(monkeypatch):
     monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
     with pytest.raises(RuntimeError, match="DASHSCOPE_API_KEY"):
         load_config()
+
+
+def test_load_config_log_dir_defaults_to_output_dir(monkeypatch):
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "sk-test")
+    monkeypatch.delenv("LOG_DIR", raising=False)
+    config = load_config()
+    assert config.log_dir == config.output_dir
+
+
+def test_load_config_log_dir_overridden_by_env(monkeypatch, tmp_path):
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "sk-test")
+    monkeypatch.setenv("LOG_DIR", str(tmp_path / "logs"))
+    config = load_config()
+    assert config.log_dir == tmp_path / "logs"
+    assert config.log_dir != config.output_dir

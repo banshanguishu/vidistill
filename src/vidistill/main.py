@@ -28,13 +28,14 @@ def build_app(config: Optional[Config] = None, output_dir: Optional[Path] = None
             qwen_model=config.qwen_model,
             paraformer_model=config.paraformer_model,
             output_dir=output_dir,
+            log_dir=output_dir,
             max_video_duration_seconds=config.max_video_duration_seconds,
             pipeline_timeout_seconds=config.pipeline_timeout_seconds,
             min_free_disk_mb=config.min_free_disk_mb,
         )
         config.output_dir.mkdir(parents=True, exist_ok=True)
 
-    setup_logging(config.output_dir)
+    setup_logging(config.log_dir)
 
     app = FastAPI(title="vidistill")
     app.state.store = _GLOBAL_STORE

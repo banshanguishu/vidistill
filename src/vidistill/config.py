@@ -14,6 +14,7 @@ class Config:
     qwen_model: str = "qwen-plus"
     paraformer_model: str = "paraformer-realtime-v2"
     output_dir: Path = field(default_factory=lambda: Path("/tmp/vidistill"))
+    log_dir: Path = field(default_factory=lambda: Path("/tmp/vidistill"))
     max_video_duration_seconds: int = 1800
     pipeline_timeout_seconds: int = 1800
     min_free_disk_mb: int = 500
@@ -26,4 +27,8 @@ def load_config() -> Config:
             "DASHSCOPE_API_KEY environment variable is required. "
             "Copy .env.example to .env and fill it in."
         )
-    return Config(dashscope_api_key=api_key)
+    log_dir_env = os.environ.get("LOG_DIR")
+    kwargs: dict = {"dashscope_api_key": api_key}
+    if log_dir_env:
+        kwargs["log_dir"] = Path(log_dir_env)
+    return Config(**kwargs)
