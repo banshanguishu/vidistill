@@ -1,0 +1,12 @@
+services:
+  vidistill:
+    image: 192.168.1.252:15000/vidistill:latest
+    container_name: vidistill
+    ports:
+      - "8000:8000"
+    environment:
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY}
+      LOG_DIR: /var/log/vidistill
+    volumes:
+      - ./logs:/var/log/vidistill
+    restart: unless-stopped
