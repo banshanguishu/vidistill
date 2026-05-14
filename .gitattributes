@@ -1,0 +1,9 @@
+# Default: treat as text, force LF in repo and working copy.
+# This prevents Windows CRLF from being introduced into files that
+# get shipped to Linux (Docker, server scripts, etc.).
+* text=auto eol=lf
+
+# Windows-native scripts MUST keep CRLF — cmd.exe expects it.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
