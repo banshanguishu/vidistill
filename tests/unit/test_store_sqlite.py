@@ -112,3 +112,51 @@ def test_list_older_than_returns_only_terminal_jobs():
     stale = store.list_older_than(datetime(2026, 5, 15))
     ids = sorted(j.job_id for j in stale)
     assert ids == ["a", "c"]  # done + failed (terminal), excluded: queued, fetching
+
+
+def test_count_active_includes_queued_and_running():
+    store = JobStore(":memory:")
+    for jid, status in [("a", "queued"), ("b", "fetching"), ("c", "done"), ("d", "cancelled")]:
+        store.create(_job(jid, "v1", status=status))
+    assert store.count_active() == 2  # a + b
+
+
+def test_queue_position_includes_running_task():
+    store = JobStore(":memory:")
+    base = datetime(2026, 5, 15, 10, 0, 0)
+    # 1 task is running
+    running = _job("r", "v1", status="fetching")
+    object.__setattr__(running, "created_at", base)
+    store.create(running)
+    # 2 queued before "me"
+    for i, jid in enumerate(["q1", "q2", "me"]):
+        j = _job(jid, "v1", status="queued")
+        object.__setattr__(j, "created_at", base + timedelta(minutes=i+1))
+        store.create(j)
+    # me has 2 queued ahead + 1 running = position 4
+    assert store.queue_position("me") == 4
+    # q1 has 0 queued ahead + 1 running = position 2
+    assert store.queue_position("q1") == 2
+
+
+def test_queue_position_none_when_no_running():
+    store = JobStore(":memory:")
+    j = _job("only", "v1", status="queued")
+    store.create(j)
+    assert store.queue_position("only") == 1
+
+
+def test_mark_zombies_failed_only_affects_in_progress():
+    store = JobStore(":memory:")
+    for jid, status in [
+        ("a", "queued"), ("b", "pending"), ("c", "fetching"),
+        ("d", "transcribing"), ("e", "summarizing"), ("f", "rendering"),
+        ("g", "done"), ("h", "failed"), ("i", "cancelled"),
+    ]:
+        store.create(_job(jid, "v1", status=status))
+    n = store.mark_zombies_failed()
+    assert n == 6
+    assert store.get("a").status == "failed"
+    assert store.get("a").error == "服务重启时中断"
+    assert store.get("g").status == "done"  # unaffected
+    assert store.get("h").status == "failed"  # unchanged

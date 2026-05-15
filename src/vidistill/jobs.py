@@ -114,6 +114,55 @@ class JobStore:
             ).fetchall()
         return [self._row_to_job(r) for r in rows]
 
+    def count_active(self) -> int:
+        """Number of jobs currently in non-terminal status (queued + running)."""
+        placeholders = ",".join("?" * len(_NON_TERMINAL))
+        with self._lock:
+            row = self._conn.execute(
+                f"SELECT COUNT(*) FROM jobs WHERE status IN ({placeholders})",
+                _NON_TERMINAL,
+            ).fetchone()
+        return row[0]
+
+    def queue_position(self, job_id: str) -> Optional[int]:
+        """Position in wait line (1-indexed) for a 'queued' job.
+
+        Includes the currently running task (if any) in the count.
+        Returns None if job is not in 'queued' status.
+        """
+        with self._lock:
+            own = self._conn.execute(
+                "SELECT created_at, status FROM jobs WHERE job_id = ?",
+                (job_id,),
+            ).fetchone()
+            if not own or own["status"] != "queued":
+                return None
+            ahead = self._conn.execute(
+                "SELECT COUNT(*) FROM jobs WHERE status = 'queued' AND created_at < ?",
+                (own["created_at"],),
+            ).fetchone()[0]
+            running_statuses = [s for s in _NON_TERMINAL if s != "queued"]
+            running_placeholders = ",".join("?" * len(running_statuses))
+            running = self._conn.execute(
+                f"SELECT COUNT(*) FROM jobs WHERE status IN ({running_placeholders})",
+                running_statuses,
+            ).fetchone()[0]
+        return ahead + 1 + (1 if running else 0)
+
+    def mark_zombies_failed(self) -> int:
+        """At startup: mark in-progress tasks as failed (restart recovery).
+
+        Returns count of jobs marked.
+        """
+        placeholders = ",".join("?" * len(_NON_TERMINAL))
+        with self._lock:
+            cur = self._conn.execute(
+                f"UPDATE jobs SET status='failed', error=?, finished_at=? "
+                f"WHERE status IN ({placeholders})",
+                ("服务重启时中断", datetime.now().isoformat(), *_NON_TERMINAL),
+            )
+        return cur.rowcount
+
     def list_older_than(self, cutoff: datetime) -> list[JobState]:
         placeholders = ",".join("?" * len(_TERMINAL))
         with self._lock:
