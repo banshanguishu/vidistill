@@ -24,3 +24,19 @@ class LLMError(VidistillError):
 
 class RenderError(VidistillError):
     """Failure rendering final output file."""
+
+
+class QueueFullError(VidistillError):
+    """Queue is at capacity (10 active jobs)."""
+
+
+class JobNotFoundError(VidistillError):
+    """Job with given id does not exist."""
+
+
+class JobNotCancellableError(VidistillError):
+    """Job cannot be cancelled because it is no longer queued."""
+
+
+class JobAccessDeniedError(VidistillError):
+    """Operation requires the visitor to be the job creator."""

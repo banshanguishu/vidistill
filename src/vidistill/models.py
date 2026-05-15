@@ -5,6 +5,7 @@ from typing import Literal, Optional
 Style = Literal["short", "chapters"]
 Format = Literal["md", "html", "pdf"]
 JobStatus = Literal[
+    "queued",        # v2 新增
     "pending",
     "fetching",
     "transcribing",
@@ -12,6 +13,7 @@ JobStatus = Literal[
     "rendering",
     "done",
     "failed",
+    "cancelled",     # v2 新增
 ]
 
 
@@ -51,6 +53,7 @@ class Summary:
 @dataclass
 class JobState:
     job_id: str
+    visitor_id: str         # v2 新增
     url: str
     video_title: str
     style: Style
@@ -58,4 +61,6 @@ class JobState:
     progress: int
     error: Optional[str]
     created_at: datetime
+    started_at: Optional[datetime] = None    # v2 新增
+    finished_at: Optional[datetime] = None   # v2 新增
     output_paths: dict[str, Optional[str]] = field(default_factory=dict)

@@ -63,6 +63,7 @@ def test_job_state_defaults():
     now = datetime.now()
     job = JobState(
         job_id="abc",
+        visitor_id="v-test",
         url="https://x",
         video_title="Sample",
         style="chapters",
@@ -76,3 +77,35 @@ def test_job_state_defaults():
     assert job.error is None
     assert job.video_title == "Sample"
     assert job.output_paths == {}
+    assert job.visitor_id == "v-test"
+    assert job.started_at is None
+    assert job.finished_at is None
+
+
+def test_job_state_queued_and_cancelled_statuses():
+    now = datetime.now()
+    queued = JobState(
+        job_id="q1",
+        visitor_id="v-test",
+        url="https://x",
+        video_title="Q",
+        style="short",
+        status="queued",
+        progress=0,
+        error=None,
+        created_at=now,
+    )
+    assert queued.status == "queued"
+
+    cancelled = JobState(
+        job_id="c1",
+        visitor_id="v-test",
+        url="https://x",
+        video_title="C",
+        style="short",
+        status="cancelled",
+        progress=0,
+        error=None,
+        created_at=now,
+    )
+    assert cancelled.status == "cancelled"

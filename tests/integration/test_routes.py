@@ -145,6 +145,7 @@ def test_download_returns_file_when_done(client, tmp_path):
     store = get_store()
     store.create(JobState(
         job_id="done1",
+        visitor_id="",  # TODO Task 11: wire visitor_id from middleware
         url="https://x",
         video_title="Done Video",
         style="short",
@@ -171,6 +172,7 @@ def test_download_returns_404_when_format_not_generated(client, tmp_path):
     store = get_store()
     store.create(JobState(
         job_id="nopdf",
+        visitor_id="",  # TODO Task 11: wire visitor_id from middleware
         url="https://x",
         video_title="X",
         style="short",

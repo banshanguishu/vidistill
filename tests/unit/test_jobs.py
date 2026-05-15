@@ -10,6 +10,7 @@ from vidistill.models import JobState
 def _job(job_id="abc"):
     return JobState(
         job_id=job_id,
+        visitor_id="v-test",
         url="https://x",
         video_title="Test",
         style="short",

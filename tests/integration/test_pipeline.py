@@ -24,6 +24,7 @@ def config(tmp_path):
 def _seed_job(store: JobStore, job_id="j1", style="chapters", title="Test Video"):
     store.create(JobState(
         job_id=job_id,
+        visitor_id="",  # TODO Task 11: wire visitor_id from middleware
         url="https://example/v",
         video_title=title,
         style=style,

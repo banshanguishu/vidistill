@@ -74,6 +74,7 @@ def create_job(
     job_id = uuid.uuid4().hex[:12]
     store.create(JobState(
         job_id=job_id,
+        visitor_id="",  # TODO Task 11: wire visitor_id from middleware
         url=str(req.url),
         video_title=meta.title,
         style=req.style,
