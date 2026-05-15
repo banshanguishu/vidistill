@@ -17,7 +17,8 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("DASHSCOPE_API_KEY", "test-key")
     from vidistill.main import build_app
     app = build_app(output_dir=tmp_path)
-    return TestClient(app)
+    with TestClient(app) as c:
+        yield c
 
 
 def test_get_root_returns_html(client):
@@ -48,7 +49,7 @@ def test_post_jobs_returns_job_id_and_queues_task(client):
     meta = VideoMetadata(title="Short", duration=300, has_subtitle=True, url="https://x")
     with (
         patch("vidistill.routes.video.fetch_metadata", return_value=meta),
-        patch("vidistill.routes.process_video") as mock_pipeline,
+        patch("vidistill.queue_worker.process_video"),
     ):
         r = client.post("/jobs", json={"url": "https://x", "style": "short"})
 
@@ -64,7 +65,7 @@ def test_get_job_status(client):
     meta = VideoMetadata(title="X", duration=100, has_subtitle=True, url="https://x")
     with (
         patch("vidistill.routes.video.fetch_metadata", return_value=meta),
-        patch("vidistill.routes.process_video"),
+        patch("vidistill.queue_worker.process_video"),
     ):
         r = client.post("/jobs", json={"url": "https://x", "style": "short"})
     job_id = r.json()["job_id"]
@@ -73,7 +74,7 @@ def test_get_job_status(client):
     assert r2.status_code == 200
     body = r2.json()
     assert body["job_id"] == job_id
-    assert body["status"] in ("pending", "fetching", "transcribing", "summarizing", "rendering", "done", "failed")
+    assert body["status"] in ("queued", "pending", "fetching", "transcribing", "summarizing", "rendering", "done", "failed")
     assert "progress" in body
     assert "available_formats" in body
 
@@ -94,7 +95,7 @@ def test_download_returns_409_when_not_done(client):
     meta = VideoMetadata(title="X", duration=100, has_subtitle=True, url="https://x")
     with (
         patch("vidistill.routes.video.fetch_metadata", return_value=meta),
-        patch("vidistill.routes.process_video"),
+        patch("vidistill.queue_worker.process_video"),
     ):
         r = client.post("/jobs", json={"url": "https://x", "style": "short"})
     job_id = r.json()["job_id"]
@@ -150,6 +151,46 @@ def test_download_returns_404_when_format_not_generated(client, tmp_path):
     ))
     r = client.get("/jobs/nopdf/download/pdf")
     assert r.status_code == 404
+
+
+def test_post_jobs_returns_queue_position(client):
+    from vidistill.models import VideoMetadata
+
+    meta = VideoMetadata(title="Short", duration=300, has_subtitle=True, url="https://x")
+    with patch("vidistill.routes.video.fetch_metadata", return_value=meta):
+        r = client.post("/jobs", json={"url": "https://x", "style": "short"})
+
+    assert r.status_code == 200
+    body = r.json()
+    assert "job_id" in body
+    assert body["queue_position"] == 1  # first task ever
+
+
+def test_post_jobs_returns_429_when_queue_full(client):
+    from vidistill.models import VideoMetadata
+
+    meta = VideoMetadata(title="X", duration=300, has_subtitle=True, url="https://x")
+    # Pre-fill the queue: 10 active jobs via direct store seeding
+    from vidistill.models import JobState
+    store = client.app.state.store
+    for i in range(10):
+        store.create(JobState(
+            job_id=f"seed{i}",
+            visitor_id="v-other",
+            url="https://x",
+            video_title=f"Seed {i}",
+            style="short",
+            status="queued",
+            progress=0,
+            error=None,
+            created_at=datetime.now(),
+        ))
+
+    with patch("vidistill.routes.video.fetch_metadata", return_value=meta):
+        r = client.post("/jobs", json={"url": "https://x", "style": "short"})
+
+    assert r.status_code == 429
+    assert "队列已满" in r.json()["detail"] or "队列" in r.json()["detail"]
 
 
 def test_exception_handler_maps_vidistill_errors(client):

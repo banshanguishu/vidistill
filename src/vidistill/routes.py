@@ -1,19 +1,19 @@
+import asyncio
 import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, HttpUrl
 
 from vidistill.adapters import video
 from vidistill.config import Config
-from vidistill.exceptions import VideoFetchError
+from vidistill.exceptions import QueueFullError, VideoFetchError
 from vidistill.jobs import JobStore
 from vidistill.models import JobState, Style
-from vidistill.pipeline import process_video
 from vidistill.renderers.markdown import sanitize_filename
 
 
@@ -29,6 +29,7 @@ class CreateJobRequest(BaseModel):
 
 class CreateJobResponse(BaseModel):
     job_id: str
+    queue_position: int
 
 
 def get_templates() -> Jinja2Templates:
@@ -42,19 +43,17 @@ def index(request: Request):
 
 
 @router.post("/jobs", response_model=CreateJobResponse)
-def create_job(
-    req: CreateJobRequest,
-    background_tasks: BackgroundTasks,
-    request: Request,
-):
+async def create_job(req: CreateJobRequest, request: Request):
     store: JobStore = request.app.state.store
     config: Config = request.app.state.config
+    queue: asyncio.Queue = request.app.state.queue
+    visitor_id: str = request.state.visitor_id
 
     try:
         meta = video.fetch_metadata(str(req.url))
     except VideoFetchError as e:
         logger.warning("POST /jobs REJECT url=%s reason=fetch_metadata_failed error=%s", req.url, e)
-        raise HTTPException(status_code=422, detail=str(e))
+        raise
 
     if meta.duration > config.max_video_duration_seconds:
         minutes = meta.duration // 60
@@ -62,40 +61,35 @@ def create_job(
             "POST /jobs REJECT url=%s reason=too_long duration_seconds=%d",
             req.url, meta.duration,
         )
-        raise HTTPException(
-            status_code=422,
-            detail=f"视频时长 {minutes} 分钟，超过 30 分钟上限",
-        )
+        raise VideoFetchError(f"视频时长 {minutes} 分钟，超过 30 分钟上限")
+
+    if store.count_active() >= 10:
+        logger.warning("POST /jobs REJECT url=%s reason=queue_full", req.url)
+        raise QueueFullError("队列已满（10 个），请稍后再试")
 
     job_id = uuid.uuid4().hex[:12]
     store.create(JobState(
         job_id=job_id,
-        visitor_id="",  # TODO Task 11: wire visitor_id from middleware
+        visitor_id=visitor_id,
         url=str(req.url),
         video_title=meta.title,
         style=req.style,
-        status="pending",
+        status="queued",
         progress=0,
         error=None,
         output_paths={},
         created_at=datetime.now(),
     ))
-    logger.info(
-        "POST /jobs ACCEPT job_id=%s title=%r duration_seconds=%d style=%s",
-        job_id, meta.title, meta.duration, req.style,
-    )
+    try:
+        queue.put_nowait(job_id)
+    except asyncio.QueueFull:
+        # Race: count_active passed but queue maxed. Roll back.
+        store.update(job_id, status="failed", error="队列竞争失败")
+        raise QueueFullError("队列已满（10 个），请稍后再试")
 
-    def _runner():
-        process_video(
-            job_id=job_id,
-            url=str(req.url),
-            style=req.style,
-            store=store,
-            config=config,
-        )
-
-    background_tasks.add_task(_runner)
-    return CreateJobResponse(job_id=job_id)
+    position = store.queue_position(job_id) or 1
+    logger.info("POST /jobs ACCEPT job_id=%s position=%d", job_id, position)
+    return CreateJobResponse(job_id=job_id, queue_position=position)
 
 
 @router.get("/jobs/{job_id}")
