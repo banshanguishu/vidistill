@@ -1,65 +1,23 @@
-#!/usr/bin/env bash
-# Server-side deploy script. Run on 192.168.1.252 (amd5950x).
-# Expects this directory to contain: docker-compose.yml, .env
-# Creates ./logs/ if absent (mounted into the container for persistent logs).
+#!/bin/bash
+# 检查参数
+APP=${1:-vidistill}
+VERSION=${2:-latest}
 
-set -euo pipefail
+echo "Deploy $APP Using version: $VERSION"
 
-# Resolve script directory, then cd there so relative paths work.
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "$SCRIPT_DIR"
+# 拉取最新镜像
+echo "Pulling image version: $VERSION..."
+docker pull 192.168.1.252:15000/$APP:$VERSION
 
-REGISTRY="192.168.1.252:15000"
-IMAGE="${REGISTRY}/vidistill:latest"
-COMPOSE_FILE="docker-compose.yml"
+mkdir -p ./logs
 
-# --- Pre-flight checks ---
-if [ ! -f "$COMPOSE_FILE" ]; then
-  echo "[FAIL] $COMPOSE_FILE not found in $SCRIPT_DIR"
-  exit 1
-fi
-if [ ! -f ".env" ]; then
-  echo "[FAIL] .env not found in $SCRIPT_DIR"
-  echo "       Create one containing: DASHSCOPE_API_KEY=sk-..."
-  exit 1
-fi
+echo "Deploying with docker-compose..."
+docker-compose pull
+docker-compose down || true
+docker-compose up -d --force-recreate
 
-# Ensure logs directory exists for the bind mount.
-mkdir -p logs
-
-echo
-echo "============================================================"
-echo "  Pulling latest image: $IMAGE"
-echo "============================================================"
-docker pull "$IMAGE"
-
-echo
-echo "============================================================"
-echo "  Restarting vidistill (force-recreate)"
-echo "============================================================"
-docker compose -f "$COMPOSE_FILE" up -d --force-recreate
-
-echo
-echo "============================================================"
-echo "  Pruning old dangling images"
-echo "============================================================"
+# 清理旧镜像
+echo "Cleaning up old images..."
 docker image prune -f
 
-echo
-echo "============================================================"
-echo "  Container status"
-echo "============================================================"
-docker compose -f "$COMPOSE_FILE" ps
-
-echo
-echo "============================================================"
-echo "  Recent uvicorn output (last 20 lines)"
-echo "============================================================"
-docker compose -f "$COMPOSE_FILE" logs --tail=20 vidistill || true
-
-echo
-echo "============================================================"
-echo "  Deploy complete."
-echo "  Web:  http://$(hostname -I | awk '{print $1}'):8000"
-echo "  Logs: tail -f $SCRIPT_DIR/logs/vidistill.log"
-echo "============================================================"
+echo "Deployment completed successfully!"
