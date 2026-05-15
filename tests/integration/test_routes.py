@@ -216,3 +216,20 @@ def test_exception_handler_maps_vidistill_errors(client):
 
     r2 = client.get("/_test/not-found")
     assert r2.status_code == 404
+
+
+def test_get_job_returns_queue_position_for_queued(client):
+    from vidistill.models import VideoMetadata
+
+    meta = VideoMetadata(title="X", duration=300, has_subtitle=True, url="https://x")
+    with patch("vidistill.routes.video.fetch_metadata", return_value=meta):
+        r = client.post("/jobs", json={"url": "https://x", "style": "short"})
+    job_id = r.json()["job_id"]
+
+    r2 = client.get(f"/jobs/{job_id}")
+    body = r2.json()
+    # status is either 'queued' (not yet picked up) or 'pending'+ (already picked)
+    if body["status"] == "queued":
+        assert body["queue_position"] == 1
+    else:
+        assert body["queue_position"] is None

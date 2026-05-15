@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, HttpUrl
 
 from vidistill.adapters import video
 from vidistill.config import Config
-from vidistill.exceptions import QueueFullError, VideoFetchError
+from vidistill.exceptions import JobNotFoundError, QueueFullError, VideoFetchError
 from vidistill.jobs import JobStore
 from vidistill.models import JobState, Style
 from vidistill.renderers.markdown import sanitize_filename
@@ -97,12 +97,13 @@ def get_job(job_id: str, request: Request):
     store: JobStore = request.app.state.store
     job = store.get(job_id)
     if not job:
-        raise HTTPException(status_code=404, detail="任务不存在")
+        raise JobNotFoundError("任务不存在")
     available_formats = [fmt for fmt, path in job.output_paths.items() if path]
     return {
         "job_id": job.job_id,
         "status": job.status,
         "progress": job.progress,
+        "queue_position": store.queue_position(job_id),
         "error": job.error,
         "video_title": job.video_title,
         "available_formats": available_formats,
