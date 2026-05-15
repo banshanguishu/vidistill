@@ -142,6 +142,59 @@
   </template>
 </div>
 
+<div class="card" x-data="myJobsApp()" x-init="init()" style="margin-top: 1.5rem;">
+  <h2 style="margin-top: 0;">我的任务（最近 7 天）</h2>
+
+  <div class="status-text" x-show="systemQueueFull" style="color: #c62828;">
+    ⚠ 当前队列已满（10 / 10），请稍后再提交
+  </div>
+  <div class="status-text" x-show="!systemQueueFull && systemActiveCount > 0">
+    ✓ 当前队列：<span x-text="systemActiveCount"></span> / 10
+  </div>
+
+  <table style="width: 100%; border-collapse: collapse; margin-top: .8rem;" x-show="jobs.length > 0">
+    <thead>
+      <tr style="border-bottom: 1px solid #ddd;">
+        <th style="text-align: left; padding: .5rem; font-size: .9rem;">标题</th>
+        <th style="text-align: left; padding: .5rem; font-size: .9rem;">状态</th>
+        <th style="text-align: left; padding: .5rem; font-size: .9rem;">操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      <template x-for="j in jobs" :key="j.job_id">
+        <tr style="border-bottom: 1px solid #f0f0f0;">
+          <td style="padding: .5rem;" x-text="j.video_title || j.job_id"></td>
+          <td style="padding: .5rem;">
+            <span class="spinner" x-show="!isTerminal(j.status)"></span>
+            <span x-text="statusLabel(j)"></span>
+          </td>
+          <td style="padding: .5rem;">
+            <template x-if="j.status === 'queued'">
+              <button @click="cancel(j.job_id)" class="retry" style="padding: .3rem .6rem; font-size: .85rem;">取消</button>
+            </template>
+            <template x-if="j.status === 'done'">
+              <span>
+                <a :href="`/jobs/${j.job_id}/download/md`" style="margin-right: .3rem;">md</a>
+                <a :href="`/jobs/${j.job_id}/download/html`" style="margin-right: .3rem;">html</a>
+                <template x-if="j.available_formats.includes('pdf')">
+                  <a :href="`/jobs/${j.job_id}/download/pdf`">pdf</a>
+                </template>
+              </span>
+            </template>
+            <template x-if="j.status === 'failed'">
+              <span :title="j.error || ''" style="color: #c62828;" x-text="'ⓘ'"></span>
+            </template>
+          </td>
+        </tr>
+      </template>
+    </tbody>
+  </table>
+
+  <div x-show="jobs.length === 0" class="status-text" style="margin-top: .8rem;">
+    暂无任务。如果之前提交过却看不到，请检查浏览器是否启用 Cookie。
+  </div>
+</div>
+
 <script>
 function vidistillApp() {
   return {
@@ -252,6 +305,65 @@ function vidistillApp() {
       this.availableFormats = [];
     },
   }
+}
+
+function myJobsApp() {
+  return {
+    jobs: [],
+    systemActiveCount: 0,
+    systemQueueFull: false,
+    pollTimer: null,
+
+    init() {
+      this.refresh();
+      this.startPolling();
+    },
+
+    startPolling() {
+      this.pollTimer = setInterval(() => this.refresh(), 3000);
+    },
+
+    async refresh() {
+      try {
+        const resp = await fetch('/my/jobs');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        this.jobs = data.jobs || [];
+        this.systemActiveCount = data.system.active_count;
+        this.systemQueueFull = data.system.queue_full;
+      } catch (e) {
+        // transient; ignore
+      }
+    },
+
+    async cancel(jobId) {
+      try {
+        await fetch(`/jobs/${jobId}`, { method: 'DELETE' });
+        this.refresh();
+      } catch (e) {
+        // ignore
+      }
+    },
+
+    isTerminal(status) {
+      return ['done', 'failed', 'cancelled'].includes(status);
+    },
+
+    statusLabel(j) {
+      const map = {
+        queued: j.queue_position ? `排队中 #${j.queue_position}` : '排队中',
+        pending: '即将开始',
+        fetching: `处理中 ${j.progress}%`,
+        transcribing: `处理中 ${j.progress}%`,
+        summarizing: `处理中 ${j.progress}%`,
+        rendering: `处理中 ${j.progress}%`,
+        done: '已完成',
+        failed: '失败',
+        cancelled: '已取消',
+      };
+      return map[j.status] || j.status;
+    },
+  };
 }
 </script>
 
