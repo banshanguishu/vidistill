@@ -20,6 +20,7 @@ from vidistill.exceptions import (
 from vidistill.jobs import JobStore
 from vidistill.logging_setup import setup_logging
 from vidistill.middleware import VisitorCookieMiddleware
+from vidistill.cleanup import cleanup_loop
 from vidistill.queue_worker import worker_loop
 from vidistill.routes import router
 
@@ -65,14 +66,19 @@ def build_app(config: Optional[Config] = None, output_dir: Optional[Path] = None
         app.state.worker_task = asyncio.create_task(
             worker_loop(app.state.store, app.state.queue, app.state.config)
         )
+        app.state.cleanup_task = asyncio.create_task(
+            cleanup_loop(app.state.store, app.state.config.output_dir)
+        )
         try:
             yield
         finally:
-            app.state.worker_task.cancel()
-            try:
-                await app.state.worker_task
-            except asyncio.CancelledError:
-                pass
+            for t in (app.state.worker_task, app.state.cleanup_task):
+                t.cancel()
+            for t in (app.state.worker_task, app.state.cleanup_task):
+                try:
+                    await t
+                except asyncio.CancelledError:
+                    pass
 
     app = FastAPI(title="vidistill", lifespan=lifespan)
     app.add_middleware(VisitorCookieMiddleware)
