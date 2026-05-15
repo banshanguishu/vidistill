@@ -105,6 +105,24 @@ class JobStore:
         with self._lock:
             self._conn.execute("DELETE FROM jobs WHERE job_id = ?", (job_id,))
 
+    def list_by_visitor(self, visitor_id: str, cutoff: datetime) -> list[JobState]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM jobs WHERE visitor_id = ? AND created_at >= ? "
+                "ORDER BY created_at DESC",
+                (visitor_id, cutoff.isoformat()),
+            ).fetchall()
+        return [self._row_to_job(r) for r in rows]
+
+    def list_older_than(self, cutoff: datetime) -> list[JobState]:
+        placeholders = ",".join("?" * len(_TERMINAL))
+        with self._lock:
+            rows = self._conn.execute(
+                f"SELECT * FROM jobs WHERE created_at < ? AND status IN ({placeholders})",
+                (cutoff.isoformat(), *_TERMINAL),
+            ).fetchall()
+        return [self._row_to_job(r) for r in rows]
+
     @staticmethod
     def _row_to_job(row: sqlite3.Row) -> JobState:
         return JobState(

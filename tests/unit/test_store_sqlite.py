@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -70,3 +70,45 @@ def test_update_output_paths():
     store.update("j1", output_paths={"md": "/a.md", "html": "/a.html", "pdf": None})
     j = store.get("j1")
     assert j.output_paths == {"md": "/a.md", "html": "/a.html", "pdf": None}
+
+
+def test_list_by_visitor_returns_only_own_jobs():
+    store = JobStore(":memory:")
+    base = datetime(2026, 5, 15, 10, 0, 0)
+    store.create(_job("a", "v1"))
+    j2 = _job("b", "v2")
+    object.__setattr__(j2, "created_at", base + timedelta(minutes=1))
+    store.create(j2)
+    j3 = _job("c", "v1")
+    object.__setattr__(j3, "created_at", base + timedelta(minutes=2))
+    store.create(j3)
+
+    rows = store.list_by_visitor("v1", cutoff=base - timedelta(days=1))
+    ids = [j.job_id for j in rows]
+    assert ids == ["c", "a"]  # DESC
+
+
+def test_list_by_visitor_filters_cutoff():
+    store = JobStore(":memory:")
+    old = _job("old", "v1")
+    object.__setattr__(old, "created_at", datetime(2026, 5, 1))
+    new = _job("new", "v1")
+    object.__setattr__(new, "created_at", datetime(2026, 5, 15))
+    store.create(old)
+    store.create(new)
+
+    rows = store.list_by_visitor("v1", cutoff=datetime(2026, 5, 10))
+    assert [j.job_id for j in rows] == ["new"]
+
+
+def test_list_older_than_returns_only_terminal_jobs():
+    store = JobStore(":memory:")
+    base = datetime(2026, 5, 1)
+    for jid, status in [("a", "done"), ("b", "queued"), ("c", "failed"), ("d", "fetching")]:
+        j = _job(jid, "v1", status=status)
+        object.__setattr__(j, "created_at", base)
+        store.create(j)
+
+    stale = store.list_older_than(datetime(2026, 5, 15))
+    ids = sorted(j.job_id for j in stale)
+    assert ids == ["a", "c"]  # done + failed (terminal), excluded: queued, fetching
