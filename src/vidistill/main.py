@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from vidistill.config import Config, load_config
 from vidistill.jobs import JobStore
 from vidistill.logging_setup import setup_logging
+from vidistill.middleware import VisitorCookieMiddleware
 from vidistill.routes import router
 
 
@@ -32,6 +33,7 @@ def build_app(config: Optional[Config] = None, output_dir: Optional[Path] = None
         logging.getLogger(__name__).warning("[startup] marked %d zombie jobs as failed", zombies)
 
     app = FastAPI(title="vidistill")
+    app.add_middleware(VisitorCookieMiddleware)
     app.state.store = store
     app.state.config = config
     app.include_router(router)
