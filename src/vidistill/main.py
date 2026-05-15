@@ -1,4 +1,6 @@
+import asyncio
 import logging
+from contextlib import asynccontextmanager
 from dataclasses import replace
 from pathlib import Path
 from typing import Optional
@@ -18,6 +20,7 @@ from vidistill.exceptions import (
 from vidistill.jobs import JobStore
 from vidistill.logging_setup import setup_logging
 from vidistill.middleware import VisitorCookieMiddleware
+from vidistill.queue_worker import worker_loop
 from vidistill.routes import router
 
 _ERROR_STATUS_MAP = {
@@ -56,7 +59,22 @@ def build_app(config: Optional[Config] = None, output_dir: Optional[Path] = None
     if zombies > 0:
         logging.getLogger(__name__).warning("[startup] marked %d zombie jobs as failed", zombies)
 
-    app = FastAPI(title="vidistill")
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        app.state.queue = asyncio.Queue(maxsize=9)
+        app.state.worker_task = asyncio.create_task(
+            worker_loop(app.state.store, app.state.queue, app.state.config)
+        )
+        try:
+            yield
+        finally:
+            app.state.worker_task.cancel()
+            try:
+                await app.state.worker_task
+            except asyncio.CancelledError:
+                pass
+
+    app = FastAPI(title="vidistill", lifespan=lifespan)
     app.add_middleware(VisitorCookieMiddleware)
     app.state.store = store
     app.state.config = config
