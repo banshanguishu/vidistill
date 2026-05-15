@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
@@ -128,3 +128,31 @@ def download(job_id: str, fmt: str, request: Request):
         raise HTTPException(status_code=404, detail="文件已失效，请重新提交任务")
     filename = sanitize_filename(job.video_title) + path.suffix
     return FileResponse(path=str(path), filename=filename)
+
+
+@router.get("/my/jobs")
+def my_jobs(request: Request):
+    store: JobStore = request.app.state.store
+    visitor_id: str = request.state.visitor_id
+    cutoff = datetime.now() - timedelta(days=7)
+    jobs = store.list_by_visitor(visitor_id, cutoff)
+    items = []
+    for j in jobs:
+        items.append({
+            "job_id": j.job_id,
+            "video_title": j.video_title,
+            "status": j.status,
+            "progress": j.progress,
+            "queue_position": store.queue_position(j.job_id),
+            "created_at": j.created_at.isoformat(),
+            "available_formats": [fmt for fmt, path in j.output_paths.items() if path],
+        })
+    active = store.count_active()
+    return {
+        "jobs": items,
+        "system": {
+            "active_count": active,
+            "active_max": 10,
+            "queue_full": active >= 10,
+        },
+    }
