@@ -11,7 +11,13 @@ from pydantic import BaseModel, Field, HttpUrl
 
 from vidistill.adapters import video
 from vidistill.config import Config
-from vidistill.exceptions import JobNotFoundError, QueueFullError, VideoFetchError
+from vidistill.exceptions import (
+    JobAccessDeniedError,
+    JobNotCancellableError,
+    JobNotFoundError,
+    QueueFullError,
+    VideoFetchError,
+)
 from vidistill.jobs import JobStore
 from vidistill.models import JobState, Style
 from vidistill.renderers.markdown import sanitize_filename
@@ -128,6 +134,21 @@ def download(job_id: str, fmt: str, request: Request):
         raise HTTPException(status_code=404, detail="文件已失效，请重新提交任务")
     filename = sanitize_filename(job.video_title) + path.suffix
     return FileResponse(path=str(path), filename=filename)
+
+
+@router.delete("/jobs/{job_id}")
+def cancel_job(job_id: str, request: Request):
+    store: JobStore = request.app.state.store
+    visitor_id: str = request.state.visitor_id
+    job = store.get(job_id)
+    if not job:
+        raise JobNotFoundError("任务不存在")
+    if job.visitor_id != visitor_id:
+        raise JobAccessDeniedError("无权操作此任务")
+    if job.status != "queued":
+        raise JobNotCancellableError("任务已开始处理，无法取消")
+    store.update(job_id, status="cancelled", finished_at=datetime.now())
+    return {"ok": True}
 
 
 @router.get("/my/jobs")

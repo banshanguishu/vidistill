@@ -233,3 +233,55 @@ def test_get_job_returns_queue_position_for_queued(client):
         assert body["queue_position"] == 1
     else:
         assert body["queue_position"] is None
+
+
+def test_delete_unknown_returns_404(client):
+    r = client.delete("/jobs/nope")
+    assert r.status_code == 404
+
+
+def test_delete_cancels_queued_job(client):
+    from vidistill.models import VideoMetadata
+    meta = VideoMetadata(title="X", duration=300, has_subtitle=True, url="https://x")
+    with patch("vidistill.routes.video.fetch_metadata", return_value=meta):
+        r = client.post("/jobs", json={"url": "https://x", "style": "short"})
+    job_id = r.json()["job_id"]
+    # In TestClient lifespan is started, but the worker may have picked it.
+    # If status is no longer 'queued', skip the success path.
+    status = client.get(f"/jobs/{job_id}").json()["status"]
+    if status != "queued":
+        pytest.skip("worker picked task before DELETE; race-y in TestClient")
+
+    r2 = client.delete(f"/jobs/{job_id}")
+    assert r2.status_code == 200
+    assert client.app.state.store.get(job_id).status == "cancelled"
+
+
+def test_delete_other_visitor_returns_403(client, tmp_path):
+    from vidistill.models import JobState
+    client.app.state.store.create(JobState(
+        job_id="not-mine",
+        visitor_id="someone-else",
+        url="https://x", video_title="T", style="short",
+        status="queued", progress=0, error=None,
+        created_at=datetime.now(),
+    ))
+    r = client.delete("/jobs/not-mine")
+    assert r.status_code == 403
+
+
+def test_delete_running_returns_409(client, tmp_path):
+    from vidistill.models import JobState
+    # Manually create as me, in fetching state
+    # Trigger visitor_id assignment first
+    client.get("/my/jobs")
+    visitor_id = client.cookies.get("visitor_id")
+    client.app.state.store.create(JobState(
+        job_id="running",
+        visitor_id=visitor_id,
+        url="https://x", video_title="T", style="short",
+        status="fetching", progress=20, error=None,
+        created_at=datetime.now(),
+    ))
+    r = client.delete("/jobs/running")
+    assert r.status_code == 409
