@@ -150,3 +150,28 @@ def test_download_returns_404_when_format_not_generated(client, tmp_path):
     ))
     r = client.get("/jobs/nopdf/download/pdf")
     assert r.status_code == 404
+
+
+def test_exception_handler_maps_vidistill_errors(client):
+    from vidistill.exceptions import QueueFullError, JobNotFoundError
+    from fastapi import APIRouter
+
+    # Inject a throw-route
+    router = APIRouter()
+
+    @router.get("/_test/queue-full")
+    def boom_queue():
+        raise QueueFullError("队列已满（10 个）")
+
+    @router.get("/_test/not-found")
+    def boom_404():
+        raise JobNotFoundError("任务不存在")
+
+    client.app.include_router(router)
+
+    r1 = client.get("/_test/queue-full")
+    assert r1.status_code == 429
+    assert "队列已满" in r1.json()["detail"]
+
+    r2 = client.get("/_test/not-found")
+    assert r2.status_code == 404

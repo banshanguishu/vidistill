@@ -4,12 +4,36 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 
 from vidistill.config import Config, load_config
+from vidistill.exceptions import (
+    VidistillError,
+    QueueFullError,
+    JobNotFoundError,
+    JobNotCancellableError,
+    JobAccessDeniedError,
+    VideoFetchError,
+)
 from vidistill.jobs import JobStore
 from vidistill.logging_setup import setup_logging
 from vidistill.middleware import VisitorCookieMiddleware
 from vidistill.routes import router
+
+_ERROR_STATUS_MAP = {
+    QueueFullError: 429,
+    JobNotFoundError: 404,
+    JobNotCancellableError: 409,
+    JobAccessDeniedError: 403,
+    VideoFetchError: 422,
+}
+
+
+def _install_exception_handlers(app: FastAPI) -> None:
+    @app.exception_handler(VidistillError)
+    async def handle_vidistill_error(request, exc: VidistillError):
+        status = _ERROR_STATUS_MAP.get(type(exc), 500)
+        return JSONResponse({"detail": str(exc)}, status_code=status)
 
 
 def build_app(config: Optional[Config] = None, output_dir: Optional[Path] = None) -> FastAPI:
@@ -36,6 +60,7 @@ def build_app(config: Optional[Config] = None, output_dir: Optional[Path] = None
     app.add_middleware(VisitorCookieMiddleware)
     app.state.store = store
     app.state.config = config
+    _install_exception_handlers(app)
     app.include_router(router)
     return app
 
