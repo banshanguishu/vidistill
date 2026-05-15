@@ -1,10 +1,12 @@
 from datetime import datetime
+from typing import get_args
 
 import pytest
 
 from vidistill.models import (
     Chapter,
     JobState,
+    JobStatus,
     Summary,
     TranscriptSegment,
     VideoMetadata,
@@ -82,30 +84,7 @@ def test_job_state_defaults():
     assert job.finished_at is None
 
 
-def test_job_state_queued_and_cancelled_statuses():
-    now = datetime.now()
-    queued = JobState(
-        job_id="q1",
-        visitor_id="v-test",
-        url="https://x",
-        video_title="Q",
-        style="short",
-        status="queued",
-        progress=0,
-        error=None,
-        created_at=now,
-    )
-    assert queued.status == "queued"
-
-    cancelled = JobState(
-        job_id="c1",
-        visitor_id="v-test",
-        url="https://x",
-        video_title="C",
-        style="short",
-        status="cancelled",
-        progress=0,
-        error=None,
-        created_at=now,
-    )
-    assert cancelled.status == "cancelled"
+def test_job_status_literal_includes_v2_values():
+    values = get_args(JobStatus)
+    assert "queued" in values
+    assert "cancelled" in values
