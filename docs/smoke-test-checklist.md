@@ -38,9 +38,6 @@ Open http://localhost:8000
 - [ ] **Close tab mid-progress → reopen page is blank**
   - Verifies Q11 behavior (no resume)
 
-- [ ] **Submit while another task is running → 409**
-  - Expect: "另一个任务正在处理中" message
-
 - [ ] **Download a completed file twice → both work**
   - Verifies file is not deleted after first download
 

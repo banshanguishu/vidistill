@@ -331,8 +331,18 @@ function myJobsApp() {
         this.jobs = data.jobs || [];
         this.systemActiveCount = data.system.active_count;
         this.systemQueueFull = data.system.queue_full;
+        this._maybeStopPolling();
       } catch (e) {
         // transient; ignore
+      }
+    },
+
+    _maybeStopPolling() {
+      const hasActive = this.systemActiveCount > 0;
+      const hasNonTerminalLocal = this.jobs.some(j => !this.isTerminal(j.status));
+      if (!hasActive && !hasNonTerminalLocal && this.pollTimer) {
+        clearInterval(this.pollTimer);
+        this.pollTimer = null;
       }
     },
 
