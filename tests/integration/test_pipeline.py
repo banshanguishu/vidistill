@@ -21,6 +21,11 @@ def config(tmp_path):
     return Config(dashscope_api_key="test-key", output_dir=tmp_path)
 
 
+@pytest.fixture
+def store(tmp_path):
+    return JobStore(tmp_path / "test.db")
+
+
 def _seed_job(store: JobStore, job_id="j1", style="chapters", title="Test Video"):
     store.create(JobState(
         job_id=job_id,
@@ -56,8 +61,7 @@ def _fake_summary(style="chapters"):
     )
 
 
-def test_pipeline_subtitle_path_skips_asr(config, tmp_path):
-    store = JobStore()
+def test_pipeline_subtitle_path_skips_asr(config, store, tmp_path):
     _seed_job(store)
 
     with (
@@ -75,8 +79,7 @@ def test_pipeline_subtitle_path_skips_asr(config, tmp_path):
     mock_asr.assert_not_called()
 
 
-def test_pipeline_asr_fallback_path(config, tmp_path):
-    store = JobStore()
+def test_pipeline_asr_fallback_path(config, store, tmp_path):
     _seed_job(store)
 
     fake_audio = tmp_path / "audio.mp3"
@@ -97,8 +100,7 @@ def test_pipeline_asr_fallback_path(config, tmp_path):
     assert job.status == "done"
 
 
-def test_pipeline_video_fetch_error_marks_failed(config):
-    store = JobStore()
+def test_pipeline_video_fetch_error_marks_failed(config, store):
     _seed_job(store)
 
     with patch("vidistill.pipeline.video.fetch_subtitle", side_effect=VideoFetchError("404")):
@@ -110,8 +112,7 @@ def test_pipeline_video_fetch_error_marks_failed(config):
     assert "404" in job.error
 
 
-def test_pipeline_asr_error_marks_failed(config, tmp_path):
-    store = JobStore()
+def test_pipeline_asr_error_marks_failed(config, store, tmp_path):
     _seed_job(store)
     audio = tmp_path / "a.mp3"
     audio.write_bytes(b"\xff")
@@ -129,8 +130,7 @@ def test_pipeline_asr_error_marks_failed(config, tmp_path):
     assert "api down" in job.error
 
 
-def test_pipeline_llm_error_marks_failed(config):
-    store = JobStore()
+def test_pipeline_llm_error_marks_failed(config, store):
     _seed_job(store)
 
     with (
@@ -145,10 +145,9 @@ def test_pipeline_llm_error_marks_failed(config):
     assert "bad json" in job.error
 
 
-def test_pipeline_writes_all_three_formats(config, tmp_path):
+def test_pipeline_writes_all_three_formats(config, store, tmp_path):
     """Pipeline always attempts all three formats; md and html are mandatory,
     pdf may be None when GTK runtime is unavailable (Windows local dev)."""
-    store = JobStore()
     _seed_job(store)
 
     with (
@@ -168,8 +167,7 @@ def test_pipeline_writes_all_three_formats(config, tmp_path):
     # pdf is best-effort: None on Windows without GTK, path on Docker/Linux
 
 
-def test_pipeline_pdf_failure_does_not_fail_job(config, tmp_path):
-    store = JobStore()
+def test_pipeline_pdf_failure_does_not_fail_job(config, store, tmp_path):
     _seed_job(store)
 
     with (

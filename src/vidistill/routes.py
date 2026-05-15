@@ -67,10 +67,6 @@ def create_job(
             detail=f"视频时长 {minutes} 分钟，超过 30 分钟上限",
         )
 
-    if not store.try_acquire_slot():
-        logger.warning("POST /jobs REJECT url=%s reason=slot_busy", req.url)
-        raise HTTPException(status_code=409, detail="另一个任务正在处理中，请稍后再试")
-
     job_id = uuid.uuid4().hex[:12]
     store.create(JobState(
         job_id=job_id,
@@ -90,16 +86,13 @@ def create_job(
     )
 
     def _runner():
-        try:
-            process_video(
-                job_id=job_id,
-                url=str(req.url),
-                style=req.style,
-                store=store,
-                config=config,
-            )
-        finally:
-            store.release_slot()
+        process_video(
+            job_id=job_id,
+            url=str(req.url),
+            style=req.style,
+            store=store,
+            config=config,
+        )
 
     background_tasks.add_task(_runner)
     return CreateJobResponse(job_id=job_id)

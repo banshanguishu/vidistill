@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
 
 from dotenv import load_dotenv
 
@@ -15,9 +16,13 @@ class Config:
     paraformer_model: str = "paraformer-realtime-v2"
     output_dir: Path = field(default_factory=lambda: Path("/tmp/vidistill"))
     log_dir: Path = field(default_factory=lambda: Path("/tmp/vidistill"))
+    db_path: Optional[Path] = None  # v2 新增；None 表示 output_dir / "vidistill.db"
     max_video_duration_seconds: int = 1800
     pipeline_timeout_seconds: int = 1800
     min_free_disk_mb: int = 500
+
+    def effective_db_path(self) -> Path:
+        return self.db_path if self.db_path else self.output_dir / "vidistill.db"
 
 
 def load_config() -> Config:
