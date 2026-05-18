@@ -9,8 +9,58 @@
   * { box-sizing: border-box; }
   body {
     font-family: -apple-system, "Segoe UI", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
-    max-width: 720px; margin: 3rem auto; padding: 0 1.5rem;
+    max-width: 1280px; margin: 3rem auto; padding: 0 1.5rem;
     color: #222; background: #fafafa; line-height: 1.6;
+  }
+  .layout {
+    display: flex;
+    gap: 1.5rem;
+    align-items: stretch;
+  }
+  .layout > .card-left {
+    flex: 0 0 520px;
+  }
+  .layout > .card-right {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .card-right > h2 {
+    flex-shrink: 0;
+  }
+  .card-right > .queue-indicator {
+    flex-shrink: 0;
+    align-self: flex-start;
+  }
+  .jobs-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    margin-top: 1rem;
+    /* subtle scrollbar styling */
+    scrollbar-width: thin;
+    scrollbar-color: #ccc transparent;
+  }
+  .jobs-scroll::-webkit-scrollbar { width: 8px; }
+  .jobs-scroll::-webkit-scrollbar-track { background: transparent; }
+  .jobs-scroll::-webkit-scrollbar-thumb {
+    background: #d0d0d0;
+    border-radius: 4px;
+  }
+  .jobs-scroll::-webkit-scrollbar-thumb:hover { background: #b0b0b0; }
+  /* sticky table header within scroll area */
+  .jobs-scroll .jobs-table thead th {
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 1;
+  }
+  @media (max-width: 960px) {
+    .layout { flex-direction: column; }
+    .layout > .card-left { flex: 1 1 auto; }
+    .layout > .card-right { flex: 1 1 auto; max-height: 600px; }
   }
   h1 { margin: 0 0 .25rem; }
   .subtitle { color: #666; margin: 0 0 2rem; }
@@ -119,7 +169,7 @@
   .btn-action-cancel:hover { background: #d93025; color: white; }
 
   /* Jobs table */
-  .jobs-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+  .jobs-table { width: 100%; border-collapse: collapse; }
   .jobs-table th {
     text-align: left; padding: .55rem .5rem;
     font-size: .75rem; font-weight: 600;
@@ -152,7 +202,8 @@
 <h1>vidistill</h1>
 <p class="subtitle">粘贴视频链接 → AI 总结 → 下载</p>
 
-<div class="card" x-data="vidistillApp()">
+<div class="layout">
+<div class="card card-left" x-data="vidistillApp()">
 
   <!-- Form -->
   <template x-if="phase === 'idle' || phase === 'submitting' || phase === 'error_input'">
@@ -229,7 +280,7 @@
   </template>
 </div>
 
-<div class="card" x-data="myJobsApp()" x-init="init()" style="margin-top: 1.5rem;">
+<div class="card card-right" x-data="myJobsApp()" x-init="init()">
   <h2 style="margin-top: 0;">我的任务（最近 7 天）</h2>
 
   <div class="queue-indicator warn" x-show="systemQueueFull">
@@ -239,6 +290,7 @@
     ✓ 当前队列：<span x-text="systemActiveCount"></span> / 10
   </div>
 
+  <div class="jobs-scroll">
   <table class="jobs-table" x-show="jobs.length > 0">
     <thead>
       <tr>
@@ -281,7 +333,9 @@
   <div x-show="jobs.length === 0" class="status-text" style="margin-top: .8rem;">
     暂无任务。如果之前提交过却看不到，请检查浏览器是否启用 Cookie。
   </div>
+  </div>
 </div>
+</div><!-- /.layout -->
 
 <script>
 function vidistillApp() {
