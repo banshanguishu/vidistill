@@ -271,6 +271,9 @@ function vidistillApp() {
           clearInterval(this.pollTimer);
           this.errorMessage = data.error || '处理失败';
           this.phase = 'error_processing';
+        } else if (data.status === 'cancelled') {
+          clearInterval(this.pollTimer);
+          this.reset();
         }
       } catch (e) {
         // transient network error; let polling continue
