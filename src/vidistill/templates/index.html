@@ -12,16 +12,15 @@
     max-width: 1280px; margin: 3rem auto; padding: 0 1.5rem;
     color: #222; background: #fafafa; line-height: 1.6;
   }
-  /* Two-column layout: left defines height, right matches and scrolls */
+  /* Two-column layout: left card defines height, right matches and scrolls */
   .layout {
     display: flex;
     gap: 1.5rem;
     align-items: flex-start;
   }
-  .layout > .left-col {
+  .layout > .card-left {
     flex: 0 0 520px;
   }
-  .layout > .left-col > h1 { margin-top: 0; }
   .layout > .right-wrapper {
     flex: 1;
     min-width: 0;
@@ -65,7 +64,7 @@
   }
   @media (max-width: 960px) {
     .layout { flex-direction: column; }
-    .layout > .left-col { flex: 1 1 auto; }
+    .layout > .card-left { flex: 1 1 auto; }
     .layout > .right-wrapper {
       flex: 1 1 auto;
       position: static;
@@ -213,13 +212,11 @@
 </head>
 <body>
 
-<div class="layout">
-<div class="left-col">
-
 <h1>vidistill</h1>
 <p class="subtitle">粘贴视频链接 → AI 总结 → 下载</p>
 
-<div class="card" x-data="vidistillApp()">
+<div class="layout">
+<div class="card card-left" x-data="vidistillApp()">
 
   <!-- Form -->
   <template x-if="phase === 'idle' || phase === 'submitting' || phase === 'error_input'">
@@ -295,8 +292,6 @@
     </div>
   </template>
 </div>
-
-</div><!-- /.left-col -->
 
 <div class="right-wrapper">
 <div class="card card-right" x-data="myJobsApp()" x-init="init()">
