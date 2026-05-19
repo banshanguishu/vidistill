@@ -5,7 +5,7 @@ from typing import Callable
 
 from vidistill.adapters import asr, llm, video
 from vidistill.config import Config
-from vidistill.exceptions import VidistillError
+from vidistill.exceptions import VideoTooLongError, VidistillError
 from vidistill.jobs import JobStore
 from vidistill.models import Style, TranscriptSegment
 from vidistill.renderers import html as html_renderer
@@ -44,7 +44,17 @@ def process_video(
     logger.info("[job=%s] pipeline START style=%s url=%s", job_id, style, url)
 
     try:
-        store.update(job_id, status="fetching", progress=10)
+        store.update(job_id, status="fetching", progress=5)
+
+        logger.info("[job=%s] STEP=fetch_metadata url=%s", job_id, url)
+        meta = video.fetch_metadata(url)
+        if meta.duration > config.max_video_duration_seconds:
+            minutes = meta.duration // 60
+            raise VideoTooLongError(
+                f"视频时长 {minutes} 分钟，超过 30 分钟上限",
+                duration=meta.duration,
+            )
+        store.update(job_id, video_title=meta.title, progress=10)
 
         logger.info("[job=%s] STEP=fetch_subtitle url=%s", job_id, url)
         subtitle = video.fetch_subtitle(url, job_dir)

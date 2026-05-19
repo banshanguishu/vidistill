@@ -9,14 +9,11 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, HttpUrl
 
-from vidistill.adapters import video
-from vidistill.config import Config
 from vidistill.exceptions import (
     JobAccessDeniedError,
     JobNotCancellableError,
     JobNotFoundError,
     QueueFullError,
-    VideoFetchError,
 )
 from vidistill.jobs import JobStore
 from vidistill.models import JobState, Style
@@ -51,23 +48,8 @@ def index(request: Request):
 @router.post("/jobs", response_model=CreateJobResponse)
 async def create_job(req: CreateJobRequest, request: Request):
     store: JobStore = request.app.state.store
-    config: Config = request.app.state.config
     queue: asyncio.Queue = request.app.state.queue
     visitor_id: str = request.state.visitor_id
-
-    try:
-        meta = video.fetch_metadata(str(req.url))
-    except VideoFetchError as e:
-        logger.warning("POST /jobs REJECT url=%s reason=fetch_metadata_failed error=%s", req.url, e)
-        raise
-
-    if meta.duration > config.max_video_duration_seconds:
-        minutes = meta.duration // 60
-        logger.warning(
-            "POST /jobs REJECT url=%s reason=too_long duration_seconds=%d",
-            req.url, meta.duration,
-        )
-        raise VideoFetchError(f"视频时长 {minutes} 分钟，超过 30 分钟上限")
 
     if store.count_active() >= 10:
         logger.warning("POST /jobs REJECT url=%s reason=queue_full", req.url)
@@ -78,7 +60,7 @@ async def create_job(req: CreateJobRequest, request: Request):
         job_id=job_id,
         visitor_id=visitor_id,
         url=str(req.url),
-        video_title=meta.title,
+        video_title="",
         style=req.style,
         status="queued",
         progress=0,

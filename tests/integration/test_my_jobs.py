@@ -25,10 +25,7 @@ def test_my_jobs_returns_empty_for_new_visitor(client):
 
 
 def test_my_jobs_isolates_by_visitor(client):
-    from vidistill.models import VideoMetadata
-
-    meta = VideoMetadata(title="T", duration=300, has_subtitle=True, url="https://x")
-    with patch("vidistill.routes.video.fetch_metadata", return_value=meta):
+    with patch("vidistill.queue_worker.process_video"):
         # visitor A submits
         r1 = client.post("/jobs", json={"url": "https://x", "style": "short"})
         assert r1.status_code == 200

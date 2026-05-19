@@ -32,21 +32,16 @@ def test_eleventh_submission_gets_429(client):
             created_at=datetime.now(),
         ))
 
-    from vidistill.models import VideoMetadata
-    meta = VideoMetadata(title="X", duration=300, has_subtitle=True, url="https://x")
-    with patch("vidistill.routes.video.fetch_metadata", return_value=meta):
+    with patch("vidistill.queue_worker.process_video"):
         r = client.post("/jobs", json={"url": "https://x", "style": "short"})
 
     assert r.status_code == 429
 
 
 def test_two_visitors_see_separate_my_jobs_lists(client):
-    from vidistill.models import VideoMetadata
-
-    meta = VideoMetadata(title="X", duration=300, has_subtitle=True, url="https://x")
     client2 = TestClient(client.app)
 
-    with patch("vidistill.routes.video.fetch_metadata", return_value=meta):
+    with patch("vidistill.queue_worker.process_video"):
         r1 = client.post("/jobs", json={"url": "https://x", "style": "short"})
         with client2:
             r2 = client2.post("/jobs", json={"url": "https://x", "style": "short"})

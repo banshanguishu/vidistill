@@ -12,6 +12,7 @@ from vidistill.models import (
     JobState,
     Summary,
     TranscriptSegment,
+    VideoMetadata,
 )
 from vidistill.pipeline import process_video
 
@@ -24,6 +25,14 @@ def config(tmp_path):
 @pytest.fixture
 def store(tmp_path):
     return JobStore(tmp_path / "test.db")
+
+
+@pytest.fixture(autouse=True)
+def mock_metadata():
+    """Pipeline now fetches metadata first; mock it for all pipeline tests."""
+    meta = VideoMetadata(title="Test Video", duration=300, has_subtitle=True, url="https://example/v")
+    with patch("vidistill.pipeline.video.fetch_metadata", return_value=meta):
+        yield
 
 
 def _seed_job(store: JobStore, job_id="j1", style="chapters", title="Test Video"):
@@ -165,6 +174,21 @@ def test_pipeline_writes_all_three_formats(config, store, tmp_path):
     assert job.output_paths["md"] is not None
     assert job.output_paths["html"] is not None
     # pdf is best-effort: None on Windows without GTK, path on Docker/Linux
+
+
+def test_pipeline_too_long_video_marks_failed(config, store, mock_metadata):
+    """Duration check moved from POST to pipeline; too-long video → status=failed."""
+    _seed_job(store)
+    long_meta = VideoMetadata(title="Long", duration=3600, has_subtitle=True, url="https://example/v")
+
+    with patch("vidistill.pipeline.video.fetch_metadata", return_value=long_meta):
+        process_video(job_id="j1", url="https://example/v", style="chapters",
+                      store=store, config=config)
+
+    job = store.get("j1")
+    assert job.status == "failed"
+    assert "60" in job.error  # 3600s = 60 minutes
+    assert "30" in job.error  # max limit
 
 
 def test_pipeline_pdf_failure_does_not_fail_job(config, store, tmp_path):

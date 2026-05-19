@@ -33,24 +33,8 @@ def test_post_jobs_rejects_invalid_url(client):
     assert r.status_code == 422
 
 
-def test_post_jobs_rejects_too_long_video(client):
-    from vidistill.models import VideoMetadata
-
-    meta = VideoMetadata(title="Long", duration=3600, has_subtitle=True, url="https://x")
-    with patch("vidistill.routes.video.fetch_metadata", return_value=meta):
-        r = client.post("/jobs", json={"url": "https://x", "style": "short"})
-    assert r.status_code == 422
-    assert "30" in r.json()["detail"] or "时长" in r.json()["detail"]
-
-
 def test_post_jobs_returns_job_id_and_queues_task(client):
-    from vidistill.models import VideoMetadata
-
-    meta = VideoMetadata(title="Short", duration=300, has_subtitle=True, url="https://x")
-    with (
-        patch("vidistill.routes.video.fetch_metadata", return_value=meta),
-        patch("vidistill.queue_worker.process_video"),
-    ):
+    with patch("vidistill.queue_worker.process_video"):
         r = client.post("/jobs", json={"url": "https://x", "style": "short"})
 
     assert r.status_code == 200
@@ -60,13 +44,7 @@ def test_post_jobs_returns_job_id_and_queues_task(client):
 
 
 def test_get_job_status(client):
-    from vidistill.models import VideoMetadata
-
-    meta = VideoMetadata(title="X", duration=100, has_subtitle=True, url="https://x")
-    with (
-        patch("vidistill.routes.video.fetch_metadata", return_value=meta),
-        patch("vidistill.queue_worker.process_video"),
-    ):
+    with patch("vidistill.queue_worker.process_video"):
         r = client.post("/jobs", json={"url": "https://x", "style": "short"})
     job_id = r.json()["job_id"]
 
@@ -90,13 +68,7 @@ def test_download_returns_404_for_unknown(client):
 
 
 def test_download_returns_409_when_not_done(client):
-    from vidistill.models import VideoMetadata
-
-    meta = VideoMetadata(title="X", duration=100, has_subtitle=True, url="https://x")
-    with (
-        patch("vidistill.routes.video.fetch_metadata", return_value=meta),
-        patch("vidistill.queue_worker.process_video"),
-    ):
+    with patch("vidistill.queue_worker.process_video"):
         r = client.post("/jobs", json={"url": "https://x", "style": "short"})
     job_id = r.json()["job_id"]
 
@@ -154,10 +126,7 @@ def test_download_returns_404_when_format_not_generated(client, tmp_path):
 
 
 def test_post_jobs_returns_queue_position(client):
-    from vidistill.models import VideoMetadata
-
-    meta = VideoMetadata(title="Short", duration=300, has_subtitle=True, url="https://x")
-    with patch("vidistill.routes.video.fetch_metadata", return_value=meta):
+    with patch("vidistill.queue_worker.process_video"):
         r = client.post("/jobs", json={"url": "https://x", "style": "short"})
 
     assert r.status_code == 200
@@ -167,11 +136,9 @@ def test_post_jobs_returns_queue_position(client):
 
 
 def test_post_jobs_returns_429_when_queue_full(client):
-    from vidistill.models import VideoMetadata
-
-    meta = VideoMetadata(title="X", duration=300, has_subtitle=True, url="https://x")
-    # Pre-fill the queue: 10 active jobs via direct store seeding
     from vidistill.models import JobState
+
+    # Pre-fill the queue: 10 active jobs via direct store seeding
     store = client.app.state.store
     for i in range(10):
         store.create(JobState(
@@ -186,7 +153,7 @@ def test_post_jobs_returns_429_when_queue_full(client):
             created_at=datetime.now(),
         ))
 
-    with patch("vidistill.routes.video.fetch_metadata", return_value=meta):
+    with patch("vidistill.queue_worker.process_video"):
         r = client.post("/jobs", json={"url": "https://x", "style": "short"})
 
     assert r.status_code == 429
@@ -219,10 +186,7 @@ def test_exception_handler_maps_vidistill_errors(client):
 
 
 def test_get_job_returns_queue_position_for_queued(client):
-    from vidistill.models import VideoMetadata
-
-    meta = VideoMetadata(title="X", duration=300, has_subtitle=True, url="https://x")
-    with patch("vidistill.routes.video.fetch_metadata", return_value=meta):
+    with patch("vidistill.queue_worker.process_video"):
         r = client.post("/jobs", json={"url": "https://x", "style": "short"})
     job_id = r.json()["job_id"]
 
@@ -241,9 +205,7 @@ def test_delete_unknown_returns_404(client):
 
 
 def test_delete_cancels_queued_job(client):
-    from vidistill.models import VideoMetadata
-    meta = VideoMetadata(title="X", duration=300, has_subtitle=True, url="https://x")
-    with patch("vidistill.routes.video.fetch_metadata", return_value=meta):
+    with patch("vidistill.queue_worker.process_video"):
         r = client.post("/jobs", json={"url": "https://x", "style": "short"})
     job_id = r.json()["job_id"]
     # In TestClient lifespan is started, but the worker may have picked it.
