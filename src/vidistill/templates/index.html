@@ -9,30 +9,17 @@
   * { box-sizing: border-box; }
   body {
     font-family: -apple-system, "Segoe UI", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
-    max-width: 1280px; margin: 3rem auto; padding: 0 1.5rem;
+    max-width: 800px; margin: 3rem auto; padding: 0 1.5rem;
     color: #222; background: #fafafa; line-height: 1.6;
   }
-  /* Two-column layout: left card defines height, right matches and scrolls */
-  .layout {
-    display: flex;
-    gap: 1.5rem;
-    align-items: flex-start;
+  /* Stacked vertical layout: form card on top, my-jobs below with capped height + scroll */
+  .right-wrapper {
+    margin-top: 1.5rem;
   }
-  .layout > .card-left {
-    flex: 0 0 520px;
-  }
-  .layout > .right-wrapper {
-    flex: 1;
-    min-width: 0;
-    align-self: stretch;
-    position: relative;
-  }
-  .layout > .right-wrapper > .card-right {
-    position: absolute;
-    inset: 0;
-    margin: 0;
+  .card-right {
     display: flex;
     flex-direction: column;
+    max-height: 500px;
     overflow: hidden;
   }
   .card-right > h2 { flex-shrink: 0; }
@@ -61,19 +48,6 @@
     top: 0;
     background: white;
     z-index: 1;
-  }
-  @media (max-width: 960px) {
-    .layout { flex-direction: column; }
-    .layout > .card-left { flex: 1 1 auto; }
-    .layout > .right-wrapper {
-      flex: 1 1 auto;
-      position: static;
-      height: 600px;
-    }
-    .layout > .right-wrapper > .card-right {
-      position: static;
-      inset: auto;
-    }
   }
   h1 { margin: 0 0 .25rem; }
   .subtitle { color: #666; margin: 0 0 2rem; }
