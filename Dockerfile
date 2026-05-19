@@ -1,8 +1,10 @@
 FROM python:3.12-slim-bookworm
 
-# System deps: ffmpeg for audio extraction, WeasyPrint runtime libs, fonts for CJK PDF
+# System deps: ffmpeg for audio extraction, WeasyPrint runtime libs, fonts for CJK PDF,
+# sqlite3 CLI for ad-hoc feedback/jobs queries via `docker exec`
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
+    sqlite3 \
     libpango-1.0-0 \
     libpangoft2-1.0-0 \
     libcairo2 \

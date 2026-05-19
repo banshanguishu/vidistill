@@ -18,26 +18,45 @@ poetry run pytest
 
 ## 查看用户反馈（服务器）
 
-服务器上通过容器内的 `sqlite3` 直接查询，无需把脚本拷过去：
+SQLite 文件通过 docker volume 挂在宿主机 `./data/` 下，**在宿主机直接查最方便**
+（不用进容器，免去镜像装 sqlite3 的麻烦）：
 
 ```bash
-docker exec vidistill sqlite3 -header -column /tmp/vidistill/vidistill.db \
+# 在 docker-compose.yml 所在目录执行
+sqlite3 -header -column ./data/vidistill.db \
   "SELECT created_at, contact, content FROM feedback ORDER BY created_at DESC;"
 ```
 
 只看最近一天：
 
 ```bash
-docker exec vidistill sqlite3 -header -column /tmp/vidistill/vidistill.db \
+sqlite3 -header -column ./data/vidistill.db \
   "SELECT * FROM feedback WHERE created_at >= datetime('now', '-1 day');"
 ```
 
 数一下总数：
 
 ```bash
-docker exec vidistill sqlite3 /tmp/vidistill/vidistill.db \
-  "SELECT COUNT(*) FROM feedback;"
+sqlite3 ./data/vidistill.db "SELECT COUNT(*) FROM feedback;"
 ```
+
+如果宿主机没装 `sqlite3` CLI：`sudo apt install -y sqlite3`。
+
+如果你嫌不方便在宿主机装，也可以用容器里的 Python（Python 自带 sqlite3 模块）：
+
+```bash
+docker exec vidistill python -c "
+import sqlite3
+c = sqlite3.connect('/tmp/vidistill/vidistill.db')
+c.row_factory = sqlite3.Row
+for r in c.execute('SELECT created_at, contact, content FROM feedback ORDER BY created_at DESC'):
+    print(f\"{r['created_at']}  contact={r['contact']}\")
+    print(f'  {r[\"content\"]}')
+    print()
+"
+```
+
+**注意**：Dockerfile 已加 `sqlite3` 作为系统依赖（用于 `docker exec vidistill sqlite3 ...`），但旧版本镜像里没有。要 `docker exec` 用 sqlite3，先 rebuild 一次镜像。
 
 本地开发环境查反馈用 `poetry run python scripts/show_feedback.py`。
 
