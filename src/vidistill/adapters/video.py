@@ -1,3 +1,4 @@
+import re
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -8,6 +9,13 @@ from yt_dlp.utils import DownloadError
 from vidistill.exceptions import VideoFetchError
 from vidistill.models import VideoMetadata
 
+_ANSI_ESCAPE = re.compile(r"\x1b\[\d+(?:;\d+)*m")
+
+
+def _clean(msg: str) -> str:
+    """Strip ANSI color escapes from yt-dlp error messages."""
+    return _ANSI_ESCAPE.sub("", msg).strip()
+
 
 def fetch_metadata(url: str) -> VideoMetadata:
     """Extract video metadata without downloading."""
@@ -16,7 +24,7 @@ def fetch_metadata(url: str) -> VideoMetadata:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
     except DownloadError as e:
-        raise VideoFetchError(f"无法访问该视频：{e}") from e
+        raise VideoFetchError(f"无法访问该视频：{_clean(str(e))}") from e
 
     has_subtitle = bool(info.get("subtitles") or info.get("automatic_captions"))
     return VideoMetadata(
@@ -44,7 +52,7 @@ def fetch_subtitle(url: str, work_dir: Path) -> Optional[str]:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
     except DownloadError as e:
-        raise VideoFetchError(f"字幕抓取失败：{e}") from e
+        raise VideoFetchError(f"字幕抓取失败：{_clean(str(e))}") from e
 
     requested = info.get("requested_subtitles")
     if not requested:
@@ -104,7 +112,7 @@ def download_audio(url: str, work_dir: Path) -> Path:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
     except DownloadError as e:
-        raise VideoFetchError(f"音频下载失败：{e}") from e
+        raise VideoFetchError(f"音频下载失败：{_clean(str(e))}") from e
 
     raw_path: Optional[Path] = None
     downloads = info.get("requested_downloads") or []
