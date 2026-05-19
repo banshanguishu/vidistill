@@ -50,7 +50,123 @@
     z-index: 1;
   }
   h1 { margin: 0 0 .25rem; }
-  .subtitle { color: #666; margin: 0 0 2rem; }
+  .subtitle { color: #666; margin: 0 0 .4rem; }
+  .feedback {
+    margin: 0 0 2rem;
+    font-size: .85rem;
+    color: #888;
+  }
+  .feedback a {
+    color: #1a73e8;
+    text-decoration: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color .15s;
+  }
+  .feedback a:hover {
+    text-decoration: underline;
+  }
+  /* Feedback modal */
+  [x-cloak] { display: none !important; }
+  .feedback-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+  }
+  .feedback-modal-content {
+    background: white;
+    border-radius: 8px;
+    padding: 1.75rem 2rem;
+    max-width: 500px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+  }
+  .feedback-modal-content h2 {
+    margin: 0 0 1rem;
+    font-size: 1.2rem;
+  }
+  .feedback-modal-content label {
+    display: block;
+    font-weight: 600;
+    margin: 1rem 0 .4rem;
+    font-size: .95rem;
+  }
+  .feedback-modal-content textarea {
+    width: 100%;
+    padding: .65rem .8rem;
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 120px;
+  }
+  .feedback-modal-content input[type=text] {
+    width: 100%;
+    padding: .55rem .8rem;
+    font-size: .95rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-family: inherit;
+  }
+  .feedback-modal-content textarea:focus,
+  .feedback-modal-content input:focus {
+    outline: 2px solid #1a73e8;
+    outline-offset: -1px;
+  }
+  .modal-actions {
+    display: flex;
+    gap: .8rem;
+    margin-top: 1.5rem;
+    justify-content: flex-end;
+  }
+  .modal-actions button {
+    padding: .55rem 1.4rem;
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: .95rem;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all .15s;
+  }
+  .btn-modal-cancel {
+    background: white;
+    border-color: #ccc;
+    color: #555;
+  }
+  .btn-modal-cancel:hover { background: #f5f5f5; }
+  .btn-modal-submit {
+    background: #1a73e8;
+    color: white;
+  }
+  .btn-modal-submit:hover { background: #1664c8; }
+  .btn-modal-submit:disabled {
+    background: #aaa;
+    cursor: not-allowed;
+  }
+  .modal-success {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: #2e7d32;
+    font-size: 1.1rem;
+    font-weight: 500;
+  }
+  .modal-error {
+    color: #c62828;
+    background: #fee;
+    border: 1px solid #fcc;
+    padding: .6rem .8rem;
+    border-radius: 6px;
+    margin-top: .8rem;
+    font-size: .85rem;
+  }
   .card { background: white; border: 1px solid #e3e3e3; border-radius: 8px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
   label { display: block; font-weight: 600; margin: 1rem 0 .4rem; }
   input[type=url], select { width: 100%; padding: .65rem .8rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 6px; }
@@ -188,6 +304,37 @@
 
 <h1>vidistill</h1>
 <p class="subtitle">粘贴视频链接 → AI 总结 → 下载</p>
+
+<div x-data="feedbackApp()">
+  <p class="feedback">
+    使用中遇到问题或想提建议？<a @click="show()">💬 点此反馈</a>
+  </p>
+
+  <div class="feedback-modal" x-show="open" x-cloak @click.self="close()" @keydown.escape.window="close()">
+    <div class="feedback-modal-content">
+      <template x-if="!submitted">
+        <div>
+          <h2>反馈问题或建议</h2>
+          <label for="fb-content">问题描述 <span style="color: #c62828;">*</span></label>
+          <textarea id="fb-content" x-model="content" placeholder="请描述你遇到的问题或想提的建议..." rows="6"></textarea>
+          <label for="fb-contact">联系方式（选填）</label>
+          <input id="fb-contact" type="text" x-model="contact" placeholder="邮箱或微信号，方便我回复你">
+          <div class="modal-actions">
+            <button class="btn-modal-cancel" @click="close()">取消</button>
+            <button class="btn-modal-submit" @click="submit()" :disabled="!content.trim() || submitting">
+              <span x-show="!submitting">提交</span>
+              <span x-show="submitting">提交中...</span>
+            </button>
+          </div>
+          <div class="modal-error" x-show="error" x-text="error"></div>
+        </div>
+      </template>
+      <template x-if="submitted">
+        <div class="modal-success">✓ 已收到反馈，感谢！</div>
+      </template>
+    </div>
+  </div>
+</div>
 
 <div class="layout">
 <div class="card card-left" x-data="vidistillApp()">
@@ -514,6 +661,56 @@ function myJobsApp() {
       if (status === 'failed') return 'badge-failed';
       if (status === 'cancelled') return 'badge-cancelled';
       return 'badge-processing';  // pending / fetching / transcribing / summarizing / rendering
+    },
+  };
+}
+
+function feedbackApp() {
+  return {
+    open: false,
+    content: '',
+    contact: '',
+    submitting: false,
+    submitted: false,
+    error: '',
+
+    show() {
+      this.content = '';
+      this.contact = '';
+      this.submitted = false;
+      this.error = '';
+      this.open = true;
+    },
+
+    close() {
+      this.open = false;
+    },
+
+    async submit() {
+      if (!this.content.trim()) return;
+      this.submitting = true;
+      this.error = '';
+      try {
+        const resp = await fetch('/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: this.content.trim(),
+            contact: this.contact.trim() || null,
+          }),
+        });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({ detail: '提交失败' }));
+          this.error = err.detail || `错误 ${resp.status}`;
+          return;
+        }
+        this.submitted = true;
+        setTimeout(() => this.close(), 2000);
+      } catch (e) {
+        this.error = '网络错误：' + e.message;
+      } finally {
+        this.submitting = false;
+      }
     },
   };
 }

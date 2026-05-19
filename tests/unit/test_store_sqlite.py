@@ -146,6 +146,29 @@ def test_queue_position_none_when_no_running():
     assert store.queue_position("only") == 1
 
 
+def test_create_feedback_persists_row():
+    store = JobStore(":memory:")
+    fb_id = store.create_feedback(
+        visitor_id="v-test",
+        content="无法播放某 B 站视频",
+        contact="user@example.com",
+    )
+    assert fb_id == 1
+    rows = store._conn.execute("SELECT * FROM feedback").fetchall()
+    assert len(rows) == 1
+    assert rows[0]["content"] == "无法播放某 B 站视频"
+    assert rows[0]["contact"] == "user@example.com"
+    assert rows[0]["visitor_id"] == "v-test"
+
+
+def test_create_feedback_with_null_contact():
+    store = JobStore(":memory:")
+    fb_id = store.create_feedback(visitor_id="v-test", content="bug", contact=None)
+    assert fb_id == 1
+    row = store._conn.execute("SELECT * FROM feedback").fetchone()
+    assert row["contact"] is None
+
+
 def test_mark_zombies_failed_only_affects_in_progress():
     store = JobStore(":memory:")
     for jid, status in [

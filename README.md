@@ -16,6 +16,31 @@ Video URL -> AI summary -> Markdown / HTML / PDF.
 poetry run pytest
 ```
 
+## 查看用户反馈（服务器）
+
+服务器上通过容器内的 `sqlite3` 直接查询，无需把脚本拷过去：
+
+```bash
+docker exec vidistill sqlite3 -header -column /tmp/vidistill/vidistill.db \
+  "SELECT created_at, contact, content FROM feedback ORDER BY created_at DESC;"
+```
+
+只看最近一天：
+
+```bash
+docker exec vidistill sqlite3 -header -column /tmp/vidistill/vidistill.db \
+  "SELECT * FROM feedback WHERE created_at >= datetime('now', '-1 day');"
+```
+
+数一下总数：
+
+```bash
+docker exec vidistill sqlite3 /tmp/vidistill/vidistill.db \
+  "SELECT COUNT(*) FROM feedback;"
+```
+
+本地开发环境查反馈用 `poetry run python scripts/show_feedback.py`。
+
 ## Troubleshooting
 
 ### "正在抓取视频信息..." stuck for minutes / yt-dlp 卡死

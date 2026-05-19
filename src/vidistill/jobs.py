@@ -29,6 +29,15 @@ CREATE TABLE IF NOT EXISTS jobs (
 CREATE INDEX IF NOT EXISTS idx_visitor_created ON jobs(visitor_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_status          ON jobs(status);
 CREATE INDEX IF NOT EXISTS idx_created_at      ON jobs(created_at);
+
+CREATE TABLE IF NOT EXISTS feedback (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    visitor_id  TEXT,
+    content     TEXT NOT NULL,
+    contact     TEXT,
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback(created_at DESC);
 """
 
 
@@ -162,6 +171,18 @@ class JobStore:
                 ("服务重启时中断", datetime.now().isoformat(), *_NON_TERMINAL),
             )
         return cur.rowcount
+
+    def create_feedback(
+        self, visitor_id: str, content: str, contact: Optional[str]
+    ) -> int:
+        """Insert a feedback row. Returns new row id."""
+        with self._lock:
+            cur = self._conn.execute(
+                "INSERT INTO feedback (visitor_id, content, contact, created_at) "
+                "VALUES (?, ?, ?, ?)",
+                (visitor_id, content, contact, datetime.now().isoformat()),
+            )
+        return cur.lastrowid
 
     def list_older_than(self, cutoff: datetime) -> list[JobState]:
         placeholders = ",".join("?" * len(_TERMINAL))

@@ -7,6 +7,8 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
+from typing import Optional
+
 from pydantic import BaseModel, Field, HttpUrl
 
 from vidistill.exceptions import (
@@ -33,6 +35,11 @@ class CreateJobRequest(BaseModel):
 class CreateJobResponse(BaseModel):
     job_id: str
     queue_position: int
+
+
+class FeedbackRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=2000)
+    contact: Optional[str] = Field(default=None, max_length=200)
 
 
 def get_templates() -> Jinja2Templates:
@@ -159,3 +166,19 @@ def my_jobs(request: Request):
             "queue_full": active >= 10,
         },
     }
+
+
+@router.post("/feedback")
+def create_feedback(req: FeedbackRequest, request: Request):
+    store: JobStore = request.app.state.store
+    visitor_id: str = request.state.visitor_id
+    content = req.content.strip()
+    contact = (req.contact or "").strip() or None
+    feedback_id = store.create_feedback(
+        visitor_id=visitor_id, content=content, contact=contact,
+    )
+    logger.info(
+        "POST /feedback ACCEPT id=%d visitor=%s has_contact=%s",
+        feedback_id, visitor_id, contact is not None,
+    )
+    return {"ok": True}

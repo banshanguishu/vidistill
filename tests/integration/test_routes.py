@@ -247,3 +247,28 @@ def test_delete_running_returns_409(client, tmp_path):
     ))
     r = client.delete("/jobs/running")
     assert r.status_code == 409
+
+
+def test_post_feedback_stores_row(client):
+    r = client.post("/feedback", json={
+        "content": "页面加载有点慢",
+        "contact": "test@example.com",
+    })
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}
+    # Verify in DB
+    rows = client.app.state.store._conn.execute(
+        "SELECT * FROM feedback"
+    ).fetchall()
+    assert len(rows) == 1
+    assert rows[0]["content"] == "页面加载有点慢"
+
+
+def test_post_feedback_accepts_null_contact(client):
+    r = client.post("/feedback", json={"content": "bug"})
+    assert r.status_code == 200
+
+
+def test_post_feedback_rejects_empty_content(client):
+    r = client.post("/feedback", json={"content": ""})
+    assert r.status_code == 422  # Pydantic min_length validation
