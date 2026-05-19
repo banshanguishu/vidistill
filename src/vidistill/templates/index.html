@@ -243,10 +243,10 @@
       <div class="success">总结完成！</div>
       <div><strong x-text="videoTitle"></strong></div>
       <div class="download-row">
-        <a class="download" :href="`/jobs/${jobId}/download/md`">下载 Markdown</a>
-        <a class="download" :href="`/jobs/${jobId}/download/html`">下载 HTML</a>
+        <a class="download" :href="`/jobs/${jobId}/download/md`" download>下载 Markdown</a>
+        <a class="download" :href="`/jobs/${jobId}/download/html`" download>下载 HTML</a>
         <template x-if="availableFormats.includes('pdf')">
-          <a class="download" :href="`/jobs/${jobId}/download/pdf`">下载 PDF</a>
+          <a class="download" :href="`/jobs/${jobId}/download/pdf`" download>下载 PDF</a>
         </template>
         <template x-if="!availableFormats.includes('pdf')">
           <button class="download-disabled" disabled title="PDF 需在服务器环境（含 GTK/字体库）生成；本地 Windows 环境无法生成。Docker 部署后可用。">下载 PDF（不可用）</button>
@@ -305,10 +305,10 @@
             </template>
             <template x-if="j.status === 'done'">
               <span>
-                <a :href="`/jobs/${j.job_id}/download/md`" class="btn-action btn-action-download">MD</a>
-                <a :href="`/jobs/${j.job_id}/download/html`" class="btn-action btn-action-download">HTML</a>
+                <a :href="`/jobs/${j.job_id}/download/md`" class="btn-action btn-action-download" download>MD</a>
+                <a :href="`/jobs/${j.job_id}/download/html`" class="btn-action btn-action-download" download>HTML</a>
                 <template x-if="j.available_formats.includes('pdf')">
-                  <a :href="`/jobs/${j.job_id}/download/pdf`" class="btn-action btn-action-download pdf">PDF</a>
+                  <a :href="`/jobs/${j.job_id}/download/pdf`" class="btn-action btn-action-download pdf" download>PDF</a>
                 </template>
               </span>
             </template>
