@@ -17,6 +17,44 @@ def _clean(msg: str) -> str:
     return _ANSI_ESCAPE.sub("", msg).strip()
 
 
+# Map yt-dlp / urllib3 error keywords to short, user-friendly Chinese messages.
+# Order matters: video-specific patterns first, then network, then HTTP, then generic.
+_FRIENDLY_PATTERNS: list[tuple[str, str]] = [
+    # 视频本身的问题
+    ("private video", "这是私密视频，无法访问"),
+    ("members-only", "这是会员专属视频，无法访问"),
+    ("video unavailable", "视频不存在、已被删除或在当前地区不可用"),
+    ("sign in to confirm your age", "视频需要登录确认年龄，无法处理"),
+    # 网络问题
+    ("network is unreachable", "服务器网络不可达，请检查出口网络或代理配置"),
+    ("name or service not known", "域名解析失败，请检查 DNS 或代理配置"),
+    ("failed to resolve", "域名解析失败，请检查 DNS 或代理配置"),
+    ("nodename nor servname", "域名解析失败，请检查 DNS 或代理配置"),
+    ("connection refused", "连接被拒绝，视频站点不可达"),
+    ("timed out", "网络连接超时，服务器可能无法访问该视频站点（请配置代理或稍后重试）"),
+    ("read timeout", "网络读取超时，请稍后重试"),
+    # HTTP 错误
+    ("http error 403", "视频站点拒绝访问（403），可能需要更新 cookies 或代理"),
+    ("http error 404", "视频不存在或已被删除"),
+]
+
+
+def _friendly_message(action: str, raw_error: str) -> str:
+    """Translate a raw yt-dlp / network error into a short Chinese message.
+
+    `action` is the high-level operation that failed (e.g. "无法访问该视频"),
+    used as the prefix. Falls back to a truncated raw message when no pattern
+    matches, so we still have something to read.
+    """
+    text = _clean(raw_error)
+    lower = text.lower()
+    for keyword, friendly in _FRIENDLY_PATTERNS:
+        if keyword in lower:
+            return f"{action}：{friendly}"
+    snippet = text[:200]
+    return f"{action}：{snippet}"
+
+
 def fetch_metadata(url: str) -> VideoMetadata:
     """Extract video metadata without downloading."""
     opts = {"quiet": True, "no_warnings": True, "skip_download": True}
@@ -24,7 +62,7 @@ def fetch_metadata(url: str) -> VideoMetadata:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
     except DownloadError as e:
-        raise VideoFetchError(f"无法访问该视频：{_clean(str(e))}") from e
+        raise VideoFetchError(_friendly_message("无法访问该视频", str(e))) from e
 
     has_subtitle = bool(info.get("subtitles") or info.get("automatic_captions"))
     return VideoMetadata(
@@ -52,7 +90,7 @@ def fetch_subtitle(url: str, work_dir: Path) -> Optional[str]:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
     except DownloadError as e:
-        raise VideoFetchError(f"字幕抓取失败：{_clean(str(e))}") from e
+        raise VideoFetchError(_friendly_message("字幕抓取失败", str(e))) from e
 
     requested = info.get("requested_subtitles")
     if not requested:
@@ -112,7 +150,7 @@ def download_audio(url: str, work_dir: Path) -> Path:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
     except DownloadError as e:
-        raise VideoFetchError(f"音频下载失败：{_clean(str(e))}") from e
+        raise VideoFetchError(_friendly_message("音频下载失败", str(e))) from e
 
     raw_path: Optional[Path] = None
     downloads = info.get("requested_downloads") or []

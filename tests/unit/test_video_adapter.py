@@ -47,11 +47,37 @@ def test_fetch_metadata_raises_video_fetch_error_on_yt_dlp_failure():
     from yt_dlp.utils import DownloadError
 
     fake_ydl = MagicMock()
-    fake_ydl.__enter__.return_value.extract_info.side_effect = DownloadError("video unavailable")
+    fake_ydl.__enter__.return_value.extract_info.side_effect = DownloadError("Video unavailable")
 
     with patch("vidistill.adapters.video.yt_dlp.YoutubeDL", return_value=fake_ydl):
-        with pytest.raises(VideoFetchError, match="video unavailable"):
+        with pytest.raises(VideoFetchError, match="视频不存在"):
             fetch_metadata("https://example/broken")
+
+
+def test_fetch_metadata_maps_network_timeout_to_friendly_message():
+    from yt_dlp.utils import DownloadError
+
+    raw = (
+        "ERROR: [youtube] abc: Unable to download API page: "
+        "Connection to www.youtube.com timed out. (connect timeout=20.0)"
+    )
+    fake_ydl = MagicMock()
+    fake_ydl.__enter__.return_value.extract_info.side_effect = DownloadError(raw)
+
+    with patch("vidistill.adapters.video.yt_dlp.YoutubeDL", return_value=fake_ydl):
+        with pytest.raises(VideoFetchError, match="网络连接超时"):
+            fetch_metadata("https://www.youtube.com/watch?v=abc")
+
+
+def test_fetch_metadata_falls_back_to_truncated_raw_on_unknown_error():
+    from yt_dlp.utils import DownloadError
+
+    fake_ydl = MagicMock()
+    fake_ydl.__enter__.return_value.extract_info.side_effect = DownloadError("weird unexpected thing")
+
+    with patch("vidistill.adapters.video.yt_dlp.YoutubeDL", return_value=fake_ydl):
+        with pytest.raises(VideoFetchError, match="weird unexpected thing"):
+            fetch_metadata("https://example/unknown")
 
 
 def test_fetch_subtitle_returns_text_when_available(tmp_path):
