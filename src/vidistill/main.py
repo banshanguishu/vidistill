@@ -7,6 +7,7 @@ from typing import Optional
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from vidistill.config import Config, load_config
 from vidistill.exceptions import (
@@ -92,6 +93,11 @@ def build_app(
     app.state.config = config
     _install_exception_handlers(app)
     app.include_router(router)
+
+    assets_dir = config.frontend_dist_dir / "assets"
+    if assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
     return app
 
 

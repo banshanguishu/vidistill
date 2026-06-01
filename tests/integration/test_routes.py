@@ -307,3 +307,17 @@ def test_get_root_serves_dist_index_when_present(tmp_path, monkeypatch):
         r = c.get("/")
     assert r.status_code == 200
     assert "BUILT_SPA_MARKER" in r.text
+
+
+def test_assets_served_when_dist_present(tmp_path, monkeypatch):
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "test-key")
+    from vidistill.main import build_app
+
+    fe = tmp_path / "fe_dist"
+    (fe / "assets").mkdir(parents=True)
+    (fe / "assets" / "app-abc123.js").write_text("console.log('hi')", encoding="utf-8")
+    app = build_app(output_dir=tmp_path, frontend_dist_dir=fe)
+    with TestClient(app) as c:
+        r = c.get("/assets/app-abc123.js")
+    assert r.status_code == 200
+    assert "console.log" in r.text
