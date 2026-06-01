@@ -10,3 +10,8 @@ docs
 tests
 *.md
 !README.md
+# 前端：node_modules / 构建产物不进构建上下文，
+# 镜像内由 node 阶段 npm ci + npm run build 重新生成（避免把 Windows 的依赖拷进 Linux 阶段）
+node_modules
+**/node_modules
+frontend/dist
