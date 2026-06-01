@@ -69,6 +69,18 @@ def process_video(
             audio_size = audio_path.stat().st_size if audio_path.exists() else 0
             logger.info("[job=%s] audio downloaded path=%s size_bytes=%d", job_id, audio_path, audio_size)
 
+            # 元数据未给出时长（duration=0，如 yt-dlp 通用提取器/登录墙站点）时，用下载后
+            # 实测时长兜底校验上限，在昂贵的 ASR 之前拦下超长视频，避免长期占住单 worker。
+            if meta.duration == 0:
+                probed = video.probe_audio_duration(audio_path)
+                logger.info("[job=%s] meta duration=0, probed audio duration=%.0fs", job_id, probed)
+                if probed > config.max_video_duration_seconds:
+                    minutes = int(probed // 60)
+                    raise VideoTooLongError(
+                        f"视频时长 {minutes} 分钟（下载后实测），超过 30 分钟上限",
+                        duration=int(probed),
+                    )
+
             store.update(job_id, status="transcribing", progress=30)
             logger.info("[job=%s] STEP=transcribe model=%s", job_id, config.paraformer_model)
             asr_started = time.monotonic()

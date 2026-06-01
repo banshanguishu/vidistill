@@ -59,7 +59,7 @@ def _friendly_message(action: str, raw_error: str) -> str:
 
 def fetch_metadata(url: str) -> VideoMetadata:
     """Extract video metadata without downloading."""
-    opts = {"quiet": True, "no_warnings": True, "skip_download": True}
+    opts = {"quiet": True, "no_warnings": True, "skip_download": True, "socket_timeout": 30}
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -82,6 +82,7 @@ def fetch_subtitle(url: str, work_dir: Path) -> Optional[str]:
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
+        "socket_timeout": 30,
         "writesubtitles": True,
         "writeautomaticsub": True,
         "subtitleslangs": ["zh", "zh-CN", "en"],
@@ -138,6 +139,7 @@ def download_audio(url: str, work_dir: Path) -> Path:
     opts = {
         "quiet": True,
         "no_warnings": True,
+        "socket_timeout": 30,
         "format": "bestaudio/best",
         "outtmpl": str(work_dir / "audio_raw.%(ext)s"),
         "postprocessors": [
@@ -199,3 +201,26 @@ def _resample_to_16k_mono(input_path: Path, output_path: Path) -> None:
         raise VideoFetchError(f"音频重采样失败：{stderr}") from e
     except FileNotFoundError as e:
         raise VideoFetchError("ffmpeg 未安装或不在 PATH 中") from e
+
+
+def probe_audio_duration(path: Path) -> float:
+    """用 ffprobe 读取音频实际时长（秒）。失败时返回 0.0（fail-open，不阻塞流程）。
+
+    用途：元数据未给出时长（如 yt-dlp 通用提取器返回 duration=0）时，
+    下载音频后用实测时长兜底校验时长上限，避免超长视频在 ASR 阶段长期占住 worker。
+    """
+    try:
+        out = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                str(path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return float(out.stdout.strip())
+    except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
+        return 0.0

@@ -191,6 +191,52 @@ def test_pipeline_too_long_video_marks_failed(config, store, mock_metadata):
     assert "30" in job.error  # max limit
 
 
+def test_pipeline_unknown_duration_enforced_after_download(config, store, tmp_path):
+    """元数据 duration=0（通用提取器拿不到时长）时，用下载后 ffprobe 实测时长兜底校验
+    30 分钟上限，且必须在 ASR 之前拦截（不浪费转写、立即释放 worker）。"""
+    _seed_job(store)
+    unknown_meta = VideoMetadata(title="Unknown", duration=0, has_subtitle=False, url="https://example/v")
+    fake_audio = tmp_path / "audio.mp3"
+    fake_audio.write_bytes(b"\xff\xfb")
+
+    with (
+        patch("vidistill.pipeline.video.fetch_metadata", return_value=unknown_meta),
+        patch("vidistill.pipeline.video.fetch_subtitle", return_value=None),
+        patch("vidistill.pipeline.video.download_audio", return_value=fake_audio),
+        patch("vidistill.pipeline.video.probe_audio_duration", return_value=4000.0),  # > 1800s
+        patch("vidistill.pipeline.asr.transcribe") as mock_asr,
+    ):
+        process_video(job_id="j1", url="https://example/v", style="chapters",
+                      store=store, config=config)
+
+    job = store.get("j1")
+    assert job.status == "failed"
+    assert "30" in job.error          # 提到 30 分钟上限
+    mock_asr.assert_not_called()      # 在 ASR 之前就拦下
+
+
+def test_pipeline_unknown_duration_within_limit_proceeds(config, store, tmp_path):
+    """duration=0 但实测在上限内时，正常继续走 ASR（兜底校验不误伤短视频）。"""
+    _seed_job(store)
+    unknown_meta = VideoMetadata(title="Unknown", duration=0, has_subtitle=False, url="https://example/v")
+    fake_audio = tmp_path / "audio.mp3"
+    fake_audio.write_bytes(b"\xff\xfb")
+
+    with (
+        patch("vidistill.pipeline.video.fetch_metadata", return_value=unknown_meta),
+        patch("vidistill.pipeline.video.fetch_subtitle", return_value=None),
+        patch("vidistill.pipeline.video.download_audio", return_value=fake_audio),
+        patch("vidistill.pipeline.video.probe_audio_duration", return_value=120.0),  # < 1800s
+        patch("vidistill.pipeline.asr.transcribe", return_value=[TranscriptSegment(0.0, 5.0, "hi")]),
+        patch("vidistill.pipeline.llm.summarize", return_value=_fake_summary()),
+    ):
+        process_video(job_id="j1", url="https://example/v", style="chapters",
+                      store=store, config=config)
+
+    job = store.get("j1")
+    assert job.status == "done"
+
+
 def test_pipeline_pdf_failure_does_not_fail_job(config, store, tmp_path):
     _seed_job(store)
 
