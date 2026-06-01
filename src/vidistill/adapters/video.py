@@ -25,6 +25,8 @@ _FRIENDLY_PATTERNS: list[tuple[str, str]] = [
     ("members-only", "这是会员专属视频，无法访问"),
     ("video unavailable", "视频不存在、已被删除或在当前地区不可用"),
     ("sign in to confirm your age", "视频需要登录确认年龄，无法处理"),
+    # YouTube 反爬（无 cookies 时偶发触发，与"确认年龄"是不同提示）
+    ("not a bot", "YouTube 反爬验证：需要登录 cookies 才能抓取，可稍后重试或换一个有字幕的视频"),
     # 网络问题
     ("network is unreachable", "服务器网络不可达，请检查出口网络或代理配置"),
     ("name or service not known", "域名解析失败，请检查 DNS 或代理配置"),

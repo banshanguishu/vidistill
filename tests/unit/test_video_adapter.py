@@ -80,6 +80,23 @@ def test_fetch_metadata_falls_back_to_truncated_raw_on_unknown_error():
             fetch_metadata("https://example/unknown")
 
 
+def test_fetch_metadata_maps_youtube_bot_check_to_friendly_message():
+    """YouTube 反爬"Sign in to confirm you're not a bot"应翻译成清晰中文，而非透出英文原文。"""
+    from yt_dlp.utils import DownloadError
+
+    # 注意：yt-dlp 实际输出用的是花引号 you’re，匹配关键词 "not a bot" 不受影响
+    raw = (
+        "ERROR: [youtube] LzgPzQud0zA: Sign in to confirm you’re not a bot. "
+        "Use --cookies-from-browser or --cookies for the authentication."
+    )
+    fake_ydl = MagicMock()
+    fake_ydl.__enter__.return_value.extract_info.side_effect = DownloadError(raw)
+
+    with patch("vidistill.adapters.video.yt_dlp.YoutubeDL", return_value=fake_ydl):
+        with pytest.raises(VideoFetchError, match="反爬验证"):
+            fetch_metadata("https://www.youtube.com/watch?v=LzgPzQud0zA")
+
+
 def test_fetch_subtitle_returns_text_when_available(tmp_path):
     """fetch_subtitle should return concatenated subtitle text or None."""
     sample_vtt = tmp_path / "sub.en.vtt"
