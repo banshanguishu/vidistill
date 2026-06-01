@@ -40,7 +40,11 @@ def _install_exception_handlers(app: FastAPI) -> None:
         return JSONResponse({"detail": str(exc)}, status_code=status)
 
 
-def build_app(config: Optional[Config] = None, output_dir: Optional[Path] = None) -> FastAPI:
+def build_app(
+    config: Optional[Config] = None,
+    output_dir: Optional[Path] = None,
+    frontend_dist_dir: Optional[Path] = None,
+) -> FastAPI:
     if config is None:
         config = load_config()
     if output_dir is not None:
@@ -51,6 +55,8 @@ def build_app(config: Optional[Config] = None, output_dir: Optional[Path] = None
             db_path=output_dir / "vidistill.db",
         )
         config.output_dir.mkdir(parents=True, exist_ok=True)
+    if frontend_dist_dir is not None:
+        config = replace(config, frontend_dist_dir=frontend_dist_dir)
 
     setup_logging(config.log_dir)
 

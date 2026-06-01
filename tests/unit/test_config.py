@@ -41,3 +41,12 @@ def test_load_config_log_dir_overridden_by_env(monkeypatch, tmp_path):
     config = load_config()
     assert config.log_dir == tmp_path / "logs"
     assert config.log_dir != config.output_dir
+
+
+def test_config_default_frontend_dist_points_to_repo_frontend(monkeypatch):
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "test-key")
+    from vidistill.config import load_config
+
+    cfg = load_config()
+    assert cfg.frontend_dist_dir.name == "dist"
+    assert cfg.frontend_dist_dir.parent.name == "frontend"

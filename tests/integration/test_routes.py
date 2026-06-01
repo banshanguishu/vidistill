@@ -272,3 +272,12 @@ def test_post_feedback_accepts_null_contact(client):
 def test_post_feedback_rejects_empty_content(client):
     r = client.post("/feedback", json={"content": ""})
     assert r.status_code == 422  # Pydantic min_length validation
+
+
+def test_build_app_accepts_frontend_dist_override(tmp_path, monkeypatch):
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "test-key")
+    from vidistill.main import build_app
+
+    fe = tmp_path / "fe_dist"
+    app = build_app(output_dir=tmp_path, frontend_dist_dir=fe)
+    assert app.state.config.frontend_dist_dir == fe
