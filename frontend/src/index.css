@@ -6,8 +6,9 @@
 
 body {
   margin: 0;
-  font-family: "Inter", -apple-system, "Segoe UI", "Source Han Sans SC",
-    "Microsoft YaHei", system-ui, sans-serif;
+  /* 站酷快乐体：俏皮可爱；后面是缺字/加载失败时的回退 */
+  font-family: "ZCOOL KuaiLe", "Inter", -apple-system, "Segoe UI",
+    "Source Han Sans SC", "Microsoft YaHei", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
