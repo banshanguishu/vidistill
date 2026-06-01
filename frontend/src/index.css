@@ -1,1 +1,63 @@
 @import "tailwindcss";
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", -apple-system, "Segoe UI", "Source Han Sans SC",
+    "Microsoft YaHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 页面背景：中性底 + 顶部一抹靛蓝光晕 */
+.app-bg {
+  background:
+    radial-gradient(1100px 460px at 50% -8%, rgba(99, 102, 241, 0.14), transparent 60%),
+    linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+  background-attachment: fixed;
+}
+
+/* logo 标记渐变 */
+.logo-mark {
+  background-image: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+}
+
+/* wordmark 渐变文字 */
+.text-gradient {
+  background-image: linear-gradient(135deg, #4f46e5 0%, #8b5cf6 55%, #ec4899 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* 主操作渐变按钮 */
+.btn-gradient {
+  background-image: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+}
+.btn-gradient:not(:disabled):hover {
+  background-image: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+}
+
+/* 进度条渐变填充 */
+.progress-fill {
+  background-image: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
+}
+
+/* 弹窗入场动画 */
+@keyframes overlayIn { from { opacity: 0 } to { opacity: 1 } }
+@keyframes contentIn {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.96) }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1) }
+}
+.dialog-overlay { animation: overlayIn 0.15s ease-out }
+.dialog-content { animation: contentIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) }
+
+/* 任务列表细滚动条 */
+.thin-scroll { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent }
+.thin-scroll::-webkit-scrollbar { width: 8px }
+.thin-scroll::-webkit-scrollbar-track { background: transparent }
+.thin-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px }
+.thin-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8 }

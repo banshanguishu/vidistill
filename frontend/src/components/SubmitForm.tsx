@@ -18,6 +18,9 @@ const STYLE_OPTIONS = [
   ['chapters', '章节笔记', '按视频章节切分，每章一段总结 + bullet，带时间戳。适合反复查阅。'],
 ] as const
 
+const DOWNLOAD_BTN =
+  'flex-1 min-w-[140px] rounded-xl bg-emerald-600 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700'
+
 export function SubmitForm({ onJobCreated }: { onJobCreated?: () => void }) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [url, setUrl] = useState('')
@@ -93,77 +96,82 @@ export function SubmitForm({ onJobCreated }: { onJobCreated?: () => void }) {
   const statusLabel = () => (STATUS_LABELS[status] ? STATUS_LABELS[status](queuePosition) : status)
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+    <div className="rounded-2xl border border-slate-200/70 bg-white p-6 shadow-xl shadow-slate-300/30 sm:p-7">
       {(phase === 'idle' || phase === 'submitting' || phase === 'error_input') && (
         <div>
-          <label htmlFor="url" className="block font-semibold mb-1">视频链接</label>
+          <label htmlFor="url" className="mb-1.5 block text-sm font-semibold text-slate-700">视频链接</label>
           <input
             id="url" type="url" value={url} onChange={(e) => setUrl(e.target.value)}
             placeholder="https://www.youtube.com/watch?v=... 或 https://www.bilibili.com/video/..."
-            className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-slate-800 placeholder:text-slate-400 transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
           />
-          <p className="text-sm text-gray-500 mt-1">支持 YouTube、Bilibili 等 yt-dlp 兼容平台。视频时长不超过 30 分钟。</p>
+          <p className="mt-1.5 text-sm text-slate-400">支持 YouTube、Bilibili 等 yt-dlp 兼容平台。视频时长不超过 30 分钟。</p>
 
-          <label className="block font-semibold mt-4 mb-2">总结形态</label>
+          <label className="mb-2 mt-5 block text-sm font-semibold text-slate-700">总结形态</label>
           <div className="flex flex-wrap gap-3">
             {STYLE_OPTIONS.map(([val, title, desc]) => (
               <label key={val}
-                className={`flex-1 min-w-[240px] cursor-pointer rounded-md border p-3 transition ${style === val ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}`}>
+                className={`relative flex-1 min-w-[240px] cursor-pointer rounded-xl border p-4 transition ${style === val ? 'border-indigo-500 bg-indigo-50/60 ring-1 ring-indigo-500/30' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
                 <input type="radio" name="style" value={val} checked={style === val} onChange={() => setStyle(val)} className="hidden" />
-                <strong className="block">{title}</strong>
-                <span className="text-sm text-gray-600">{desc}</span>
+                {style === val && (
+                  <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500 text-[11px] text-white">✓</span>
+                )}
+                <strong className="block text-slate-800">{title}</strong>
+                <span className="mt-1 block text-sm text-slate-500">{desc}</span>
               </label>
             ))}
           </div>
 
           <button onClick={submit} disabled={phase === 'submitting' || !url}
-            className="mt-6 w-full rounded-md bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:bg-gray-400">
+            className="btn-gradient mt-6 w-full rounded-xl py-3 font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:shadow-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none">
             {phase === 'submitting' ? '提交中...' : '开始生成'}
           </button>
           {phase === 'error_input' && (
-            <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-700">{errorMessage}</div>
+            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-sm text-rose-700">{errorMessage}</div>
           )}
         </div>
       )}
 
       {phase === 'polling' && (
-        <div>
-          <div className="font-semibold">{videoTitle || '处理中'}</div>
-          <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
-            <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-200 border-t-blue-600" />
+        <div className="py-2">
+          <div className="font-semibold text-slate-800">{videoTitle || '处理中'}</div>
+          <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
+            <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-200 border-t-indigo-500" />
             <span>{statusLabel()}</span>
           </div>
-          <div className="mt-3 h-2 w-full overflow-hidden rounded bg-gray-200">
-            <div className="h-full bg-blue-600 transition-all" style={{ width: `${progress}%` }} />
+          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+            <div className="progress-fill h-full rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
           </div>
-          <div className="mt-1 text-sm text-gray-500">{progress}%</div>
+          <div className="mt-1.5 text-right text-sm font-medium tabular-nums text-slate-400">{progress}%</div>
         </div>
       )}
 
       {phase === 'ready' && jobId && (
         <div>
-          <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-green-700">总结完成！</div>
-          <div className="mt-2 font-semibold">{videoTitle}</div>
+          <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700">
+            <span className="text-lg">✓</span><span className="font-semibold">总结完成！</span>
+          </div>
+          <div className="mt-3 font-semibold text-slate-800">{videoTitle}</div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <a className="flex-1 min-w-[140px] rounded-md bg-green-700 px-4 py-2 text-center font-semibold text-white hover:bg-green-800" href={downloadUrl(jobId, 'md')} download>下载 Markdown</a>
-            <a className="flex-1 min-w-[140px] rounded-md bg-green-700 px-4 py-2 text-center font-semibold text-white hover:bg-green-800" href={downloadUrl(jobId, 'html')} download>下载 HTML</a>
+            <a className={DOWNLOAD_BTN} href={downloadUrl(jobId, 'md')} download>下载 Markdown</a>
+            <a className={DOWNLOAD_BTN} href={downloadUrl(jobId, 'html')} download>下载 HTML</a>
             {availableFormats.includes('pdf') ? (
-              <a className="flex-1 min-w-[140px] rounded-md bg-green-700 px-4 py-2 text-center font-semibold text-white hover:bg-green-800" href={downloadUrl(jobId, 'pdf')} download>下载 PDF</a>
+              <a className={DOWNLOAD_BTN} href={downloadUrl(jobId, 'pdf')} download>下载 PDF</a>
             ) : (
               <button disabled title="PDF 需在服务器环境（含 GTK/字体库）生成；本地 Windows 环境无法生成。Docker 部署后可用。"
-                className="flex-1 min-w-[140px] cursor-not-allowed rounded-md bg-gray-300 px-4 py-2 text-center font-semibold text-gray-600">下载 PDF（不可用）</button>
+                className="flex-1 min-w-[140px] cursor-not-allowed rounded-xl bg-slate-100 px-4 py-2.5 text-center text-sm font-semibold text-slate-400">下载 PDF（不可用）</button>
             )}
           </div>
-          <button onClick={reset} className="mt-4 rounded-md bg-gray-600 px-4 py-2 text-white hover:bg-gray-700">再来一个</button>
+          <button onClick={reset} className="mt-4 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50">再来一个</button>
         </div>
       )}
 
       {phase === 'error_processing' && (
         <div>
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-700">{errorMessage}</div>
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">{errorMessage}</div>
           <div className="mt-4 flex gap-2">
-            <button onClick={() => { setErrorMessage(''); submit() }} className="rounded-md bg-gray-600 px-4 py-2 text-white hover:bg-gray-700">重试</button>
-            <button onClick={reset} className="rounded-md bg-gray-600 px-4 py-2 text-white hover:bg-gray-700">换一个视频</button>
+            <button onClick={() => { setErrorMessage(''); submit() }} className="rounded-xl bg-slate-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800">重试</button>
+            <button onClick={reset} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50">换一个视频</button>
           </div>
         </div>
       )}
