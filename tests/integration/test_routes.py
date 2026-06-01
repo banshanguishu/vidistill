@@ -290,3 +290,20 @@ def test_get_root_fallback_when_no_build(client):
     assert r.status_code == 200
     assert "text/html" in r.headers["content-type"]
     assert "vidistill" in r.text.lower()
+
+
+def test_get_root_serves_dist_index_when_present(tmp_path, monkeypatch):
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "test-key")
+    from vidistill.main import build_app
+
+    fe = tmp_path / "fe_dist"
+    fe.mkdir(parents=True)
+    (fe / "index.html").write_text(
+        "<!doctype html><title>vidistill</title><div id=root>BUILT_SPA_MARKER</div>",
+        encoding="utf-8",
+    )
+    app = build_app(output_dir=tmp_path, frontend_dist_dir=fe)
+    with TestClient(app) as c:
+        r = c.get("/")
+    assert r.status_code == 200
+    assert "BUILT_SPA_MARKER" in r.text
