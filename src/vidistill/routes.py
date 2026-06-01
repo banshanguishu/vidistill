@@ -6,7 +6,6 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
-from fastapi.templating import Jinja2Templates
 from typing import Optional
 
 from pydantic import BaseModel, Field, HttpUrl
@@ -42,14 +41,24 @@ class FeedbackRequest(BaseModel):
     contact: Optional[str] = Field(default=None, max_length=200)
 
 
-def get_templates() -> Jinja2Templates:
-    templates_dir = Path(__file__).parent / "templates"
-    return Jinja2Templates(directory=str(templates_dir))
+_FALLBACK_HTML = """<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><title>vidistill</title></head>
+<body style="font-family: sans-serif; max-width: 640px; margin: 4rem auto; padding: 0 1.5rem; color:#333; line-height:1.6;">
+<h1>vidistill</h1>
+<p>前端尚未构建。</p>
+<ul>
+<li>生产 / 预览：<code>cd frontend &amp;&amp; npm install &amp;&amp; npm run build</code>，然后刷新本页。</li>
+<li>本地开发：另开终端 <code>cd frontend &amp;&amp; npm run dev</code>，访问 <a href="http://localhost:5173">http://localhost:5173</a>（已配置代理到本服务）。</li>
+</ul>
+</body></html>"""
 
 
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return get_templates().TemplateResponse(request, "index.html")
+    dist_index = request.app.state.config.frontend_dist_dir / "index.html"
+    if dist_index.exists():
+        return FileResponse(str(dist_index), media_type="text/html")
+    return HTMLResponse(_FALLBACK_HTML)
 
 
 @router.post("/jobs", response_model=CreateJobResponse)

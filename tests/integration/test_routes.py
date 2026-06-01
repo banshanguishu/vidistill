@@ -281,3 +281,12 @@ def test_build_app_accepts_frontend_dist_override(tmp_path, monkeypatch):
     fe = tmp_path / "fe_dist"
     app = build_app(output_dir=tmp_path, frontend_dist_dir=fe)
     assert app.state.config.frontend_dist_dir == fe
+
+
+def test_get_root_fallback_when_no_build(client):
+    # client fixture 用 build_app(output_dir=tmp_path)，frontend_dist 指向真实仓库路径，
+    # 测试环境通常未构建 → 返回兜底页。
+    r = client.get("/")
+    assert r.status_code == 200
+    assert "text/html" in r.headers["content-type"]
+    assert "vidistill" in r.text.lower()
