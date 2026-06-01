@@ -1,3 +1,12 @@
+# --- 前端构建阶段 ---
+FROM node:20-slim AS frontend
+WORKDIR /fe
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
+# --- 后端运行阶段 ---
 FROM python:3.12-slim-bookworm
 
 # System deps: ffmpeg for audio extraction, WeasyPrint runtime libs, fonts for CJK PDF,
@@ -14,7 +23,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry
 ENV POETRY_VERSION=1.8.3 \
     POETRY_VIRTUALENVS_CREATE=false \
     POETRY_NO_INTERACTION=1
@@ -22,15 +30,15 @@ RUN pip install --no-cache-dir "poetry==${POETRY_VERSION}"
 
 WORKDIR /app
 
-# Install dependencies first (better layer caching)
 COPY pyproject.toml poetry.lock ./
 RUN poetry install --only main --no-root
 
-# Copy source
 COPY src ./src
 RUN poetry install --only-root
 
-# Create the output directory
+# 前端构建产物（与 config._default_frontend_dist 的 /app/frontend/dist 对齐）
+COPY --from=frontend /fe/dist ./frontend/dist
+
 RUN mkdir -p /tmp/vidistill
 
 ENV PYTHONUNBUFFERED=1 \
