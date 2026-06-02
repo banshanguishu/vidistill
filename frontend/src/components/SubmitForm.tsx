@@ -14,8 +14,8 @@ const STATUS_LABELS: Record<string, (pos: number | null) => string> = {
 }
 
 const STYLE_OPTIONS = [
-  ['short', '短摘要', '3-5 句核心要点 + 5-10 条 bullet。适合快速判断"这视频值不值得看"。'],
-  ['chapters', '章节笔记', '按视频章节切分，每章一段总结 + bullet，带时间戳。适合反复查阅。'],
+  ['short', '短摘要', '几句话讲清核心内容，再列几条要点。适合快速判断这视频值不值得看。'],
+  ['chapters', '章节笔记', '按视频章节拆分，每章一段小结加几条要点，并标注对应时间点。适合反复查阅。'],
 ] as const
 
 const DOWNLOAD_BTN =
@@ -115,12 +115,22 @@ export function SubmitForm({ onJobCreated }: { onJobCreated?: () => void }) {
       {(phase === 'idle' || phase === 'submitting' || phase === 'error_input') && (
         <div>
           <label htmlFor="url" className="mb-1.5 block text-sm font-semibold text-slate-700">视频链接</label>
-          <input
-            id="url" type="url" value={url} onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://www.youtube.com/watch?v=... 或 https://www.bilibili.com/video/..."
-            className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-slate-800 placeholder:text-slate-400 transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-          />
-          <p className="mt-1.5 text-sm text-slate-400">支持 YouTube、Bilibili 等 yt-dlp 兼容平台。视频时长不超过 30 分钟。</p>
+          <div className="relative">
+            <input
+              id="url" type="url" value={url} onChange={(e) => setUrl(e.target.value)}
+              placeholder="粘贴视频链接"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 pr-10 text-slate-800 placeholder:text-slate-400 transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+            />
+            {url && (
+              <button
+                type="button" onClick={() => setUrl('')} aria-label="清空"
+                className="absolute right-3 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-slate-300 text-xs text-white transition hover:bg-slate-400"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          <p className="mt-1.5 text-sm text-slate-400">支持 YouTube、Bilibili 等主流视频网站。视频时长不超过 30 分钟。</p>
           {showUrlError && (
             <p className="mt-1.5 text-sm text-rose-600">请输入有效的视频链接（需以 http:// 或 https:// 开头）</p>
           )}
