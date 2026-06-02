@@ -13,6 +13,11 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* 所有可点击按钮显示小手光标（禁用态由 Tailwind 的 disabled:cursor-not-allowed 处理） */
+button:not(:disabled) {
+  cursor: pointer;
+}
+
 /* 页面背景：中性底 + 顶部一抹靛蓝光晕 */
 .app-bg {
   background:
@@ -49,9 +54,11 @@ body {
 
 /* 弹窗入场动画 */
 @keyframes overlayIn { from { opacity: 0 } to { opacity: 1 } }
+/* 居中由 Tailwind 的 translate(-50% -50%) 负责；这里只动 scale + opacity，
+   避免与 translate 叠加导致动画期间偏移翻倍、结束时瞬移回中心 */
 @keyframes contentIn {
-  from { opacity: 0; transform: translate(-50%, -48%) scale(0.96) }
-  to   { opacity: 1; transform: translate(-50%, -50%) scale(1) }
+  from { opacity: 0; transform: scale(0.94) }
+  to   { opacity: 1; transform: scale(1) }
 }
 .dialog-overlay { animation: overlayIn 0.15s ease-out }
 .dialog-content { animation: contentIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) }
