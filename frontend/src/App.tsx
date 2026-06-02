@@ -2,6 +2,7 @@ import { cancelJob } from './api'
 import { SubmitForm } from './components/SubmitForm'
 import { MyJobs } from './components/MyJobs'
 import { FeedbackModal } from './components/FeedbackModal'
+import { TutorialModal } from './components/TutorialModal'
 import { useMyJobs } from './hooks/useMyJobs'
 
 export default function App() {
@@ -19,8 +20,8 @@ export default function App() {
               <p className="text-sm text-slate-500">粘贴视频链接 → AI 总结 → 下载</p>
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-1.5 text-sm text-slate-400">
-            <span>使用中遇到问题或想提建议？</span>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <TutorialModal />
             <FeedbackModal />
           </div>
         </header>
