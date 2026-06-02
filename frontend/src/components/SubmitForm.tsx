@@ -21,6 +21,17 @@ const STYLE_OPTIONS = [
 const DOWNLOAD_BTN =
   'flex-1 min-w-[140px] rounded-xl bg-emerald-600 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700'
 
+/** 仅校验“是不是一个合法的 http(s) URL”。挡不了“格式对但不是视频”——那由后端兜底。 */
+function isValidHttpUrl(value: string): boolean {
+  let parsed: URL
+  try {
+    parsed = new URL(value.trim())
+  } catch {
+    return false
+  }
+  return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+}
+
 export function SubmitForm({ onJobCreated }: { onJobCreated?: () => void }) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [url, setUrl] = useState('')
@@ -79,9 +90,10 @@ export function SubmitForm({ onJobCreated }: { onJobCreated?: () => void }) {
   }
 
   const submit = async () => {
+    if (!isValidHttpUrl(url)) return  // 兜底：按钮已禁用，这里防回车等绕过
     setPhase('submitting'); setErrorMessage('')
     try {
-      const data = await createJob(url, style)
+      const data = await createJob(url.trim(), style)
       setJobId(data.job_id)
       setQueuePosition(data.queue_position)
       setPhase('polling')
@@ -95,6 +107,9 @@ export function SubmitForm({ onJobCreated }: { onJobCreated?: () => void }) {
 
   const statusLabel = () => (STATUS_LABELS[status] ? STATUS_LABELS[status](queuePosition) : status)
 
+  const urlValid = isValidHttpUrl(url)
+  const showUrlError = url.trim() !== '' && !urlValid
+
   return (
     <div className="rounded-2xl border border-slate-200/70 bg-white p-6 shadow-xl shadow-slate-300/30 sm:p-7">
       {(phase === 'idle' || phase === 'submitting' || phase === 'error_input') && (
@@ -106,6 +121,9 @@ export function SubmitForm({ onJobCreated }: { onJobCreated?: () => void }) {
             className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-slate-800 placeholder:text-slate-400 transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
           />
           <p className="mt-1.5 text-sm text-slate-400">支持 YouTube、Bilibili 等 yt-dlp 兼容平台。视频时长不超过 30 分钟。</p>
+          {showUrlError && (
+            <p className="mt-1.5 text-sm text-rose-600">请输入有效的视频链接（需以 http:// 或 https:// 开头）</p>
+          )}
 
           <label className="mb-2 mt-5 block text-sm font-semibold text-slate-700">总结形态</label>
           <div className="flex flex-wrap gap-3">
@@ -122,7 +140,7 @@ export function SubmitForm({ onJobCreated }: { onJobCreated?: () => void }) {
             ))}
           </div>
 
-          <button onClick={submit} disabled={phase === 'submitting' || !url}
+          <button onClick={submit} disabled={phase === 'submitting' || !urlValid}
             className="btn-gradient mt-6 w-full rounded-xl py-3 font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:shadow-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none">
             {phase === 'submitting' ? '提交中...' : '开始生成'}
           </button>
