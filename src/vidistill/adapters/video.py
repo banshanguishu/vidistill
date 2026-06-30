@@ -1,3 +1,4 @@
+import logging
 import re
 import subprocess
 from pathlib import Path
@@ -9,7 +10,24 @@ from yt_dlp.utils import DownloadError
 from vidistill.exceptions import VideoFetchError
 from vidistill.models import VideoMetadata
 
+logger = logging.getLogger(__name__)
+
 _ANSI_ESCAPE = re.compile(r"\x1b\[\d+(?:;\d+)*m")
+
+
+def _apply_cookies(opts: dict, cookies_file: Optional[Path]) -> dict:
+    """若配置了 cookies 文件且存在，则注入 yt-dlp 的 cookiefile 选项。
+
+    文件缺失时只记一条警告并跳过（fail-open）：不带 cookie 仍能服务 YouTube 等
+    不需要登录态的站点，避免一个配错的路径让所有抓取直接崩。
+    """
+    if not cookies_file:
+        return opts
+    if not Path(cookies_file).exists():
+        logger.warning("YTDLP_COOKIES 指向的文件不存在，忽略：%s", cookies_file)
+        return opts
+    opts["cookiefile"] = str(cookies_file)
+    return opts
 
 
 def _clean(msg: str) -> str:
@@ -57,9 +75,18 @@ def _friendly_message(action: str, raw_error: str) -> str:
     return f"{action}：{snippet}"
 
 
-def fetch_metadata(url: str) -> VideoMetadata:
+def fetch_metadata(url: str, cookies_file: Optional[Path] = None) -> VideoMetadata:
     """Extract video metadata without downloading."""
-    opts = {"quiet": True, "no_warnings": True, "skip_download": True, "socket_timeout": 30}
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        "socket_timeout": 30,
+        # 合集/多 P 视频（如 B 站 200 集课程）只取当前这一个，不展开整个播放列表，
+        # 否则 extract_info 会枚举全部分 P（极慢），且播放列表 duration 为空会绕过时长上限。
+        "noplaylist": True,
+    }
+    _apply_cookies(opts, cookies_file)
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -75,7 +102,7 @@ def fetch_metadata(url: str) -> VideoMetadata:
     )
 
 
-def fetch_subtitle(url: str, work_dir: Path) -> Optional[str]:
+def fetch_subtitle(url: str, work_dir: Path, cookies_file: Optional[Path] = None) -> Optional[str]:
     """Try to fetch subtitle text. Returns concatenated lines or None if unavailable."""
     work_dir.mkdir(parents=True, exist_ok=True)
     opts = {
@@ -83,12 +110,14 @@ def fetch_subtitle(url: str, work_dir: Path) -> Optional[str]:
         "no_warnings": True,
         "skip_download": True,
         "socket_timeout": 30,
+        "noplaylist": True,  # 合集/多 P 只取当前视频，理由见 fetch_metadata
         "writesubtitles": True,
         "writeautomaticsub": True,
         "subtitleslangs": ["zh", "zh-CN", "en"],
         "subtitlesformat": "vtt",
         "outtmpl": str(work_dir / "%(id)s.%(ext)s"),
     }
+    _apply_cookies(opts, cookies_file)
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -126,7 +155,7 @@ def _parse_vtt(path: Path) -> str:
     return "\n".join(text_lines)
 
 
-def download_audio(url: str, work_dir: Path) -> Path:
+def download_audio(url: str, work_dir: Path, cookies_file: Optional[Path] = None) -> Path:
     """Download audio-only stream, extract as MP3, then resample to 16kHz mono.
 
     Two-step process:
@@ -140,6 +169,7 @@ def download_audio(url: str, work_dir: Path) -> Path:
         "quiet": True,
         "no_warnings": True,
         "socket_timeout": 30,
+        "noplaylist": True,  # 合集/多 P 只下当前视频，否则会下整个列表，理由见 fetch_metadata
         "format": "bestaudio/best",
         "outtmpl": str(work_dir / "audio_raw.%(ext)s"),
         "postprocessors": [
@@ -150,6 +180,7 @@ def download_audio(url: str, work_dir: Path) -> Path:
             }
         ],
     }
+    _apply_cookies(opts, cookies_file)
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)

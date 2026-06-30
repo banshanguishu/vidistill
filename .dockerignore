@@ -6,6 +6,9 @@ __pycache__
 .env
 .idea
 .vscode
+# cookie 含登录凭证，且通过 docker-compose 卷在运行时挂载，绝不进镜像
+cookies.txt
+*cookies*.txt
 docs
 tests
 *.md

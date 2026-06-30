@@ -26,6 +26,10 @@ class Config:
     max_video_duration_seconds: int = 1800
     pipeline_timeout_seconds: int = 1800
     min_free_disk_mb: int = 500
+    # 可选：Netscape 格式 cookies.txt 路径（env YTDLP_COOKIES）。传给 yt-dlp 用于
+    # 带登录态访问站点。B 站尤其需要：有 SESSDATA 时 yt-dlp 直接从网页读播放信息，
+    # 绕开被风控的 playurl API（否则 HTTP 412）。None = 不带 cookie（现状）。
+    ytdlp_cookies_file: Optional[Path] = None
 
     def effective_db_path(self) -> Path:
         return self.db_path if self.db_path else self.output_dir / "vidistill.db"
@@ -42,4 +46,7 @@ def load_config() -> Config:
     kwargs: dict = {"dashscope_api_key": api_key}
     if log_dir_env:
         kwargs["log_dir"] = Path(log_dir_env)
+    cookies_env = os.environ.get("YTDLP_COOKIES")
+    if cookies_env:
+        kwargs["ytdlp_cookies_file"] = Path(cookies_env)
     return Config(**kwargs)

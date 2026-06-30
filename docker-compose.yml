@@ -7,7 +7,12 @@ services:
     environment:
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY}
       LOG_DIR: /var/log/vidistill
+      # B 站等站点需要登录态 cookie 才能绕开 playurl 412 风控；把宿主的 cookies.txt
+      # 挂进来（见下方 volumes），路径指向容器内挂载点。不需要时删掉这行即可。
+      YTDLP_COOKIES: /app/cookies.txt
     volumes:
       - ./logs:/var/log/vidistill
       - ./data:/tmp/vidistill
+      # 只读挂载宿主的 cookies.txt（放在 compose 同目录）。cookie 失效后替换此文件即可，无需重建镜像。
+      - ./cookies.txt:/app/cookies.txt:ro
     restart: unless-stopped

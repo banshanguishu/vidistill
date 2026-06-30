@@ -12,7 +12,7 @@ fastapi = "^0.115"
 uvicorn = {extras = ["standard"], version = "^0.32"}
 python-multipart = "^0.0.9"
 python-dotenv = "^1.0"
-yt-dlp = ">=2026.3.17"
+yt-dlp = ">=2026.6.9"
 openai = "^1.55"
 dashscope = "^1.20"
 "markdown-it-py" = "^3.0"

@@ -47,7 +47,7 @@ def process_video(
         store.update(job_id, status="fetching", progress=5)
 
         logger.info("[job=%s] STEP=fetch_metadata url=%s", job_id, url)
-        meta = video.fetch_metadata(url)
+        meta = video.fetch_metadata(url, cookies_file=config.ytdlp_cookies_file)
         if meta.duration > config.max_video_duration_seconds:
             minutes = meta.duration // 60
             raise VideoTooLongError(
@@ -57,7 +57,7 @@ def process_video(
         store.update(job_id, video_title=meta.title, progress=10)
 
         logger.info("[job=%s] STEP=fetch_subtitle url=%s", job_id, url)
-        subtitle = video.fetch_subtitle(url, job_dir)
+        subtitle = video.fetch_subtitle(url, job_dir, cookies_file=config.ytdlp_cookies_file)
         if subtitle:
             logger.info("[job=%s] subtitle FOUND chars=%d (skip ASR)", job_id, len(subtitle))
             segments = [TranscriptSegment(start=0.0, end=0.0, text=subtitle)]
@@ -65,7 +65,7 @@ def process_video(
         else:
             logger.info("[job=%s] subtitle NOT FOUND, falling back to ASR", job_id)
             logger.info("[job=%s] STEP=download_audio url=%s", job_id, url)
-            audio_path = video.download_audio(url, job_dir)
+            audio_path = video.download_audio(url, job_dir, cookies_file=config.ytdlp_cookies_file)
             audio_size = audio_path.stat().st_size if audio_path.exists() else 0
             logger.info("[job=%s] audio downloaded path=%s size_bytes=%d", job_id, audio_path, audio_size)
 
