@@ -8,8 +8,43 @@ from vidistill.adapters.video import (
     fetch_metadata,
     fetch_subtitle,
     download_audio,
+    _apply_cookies,
 )
 from vidistill.exceptions import VideoFetchError
+
+
+def _write_bilibili_cookies(tmp_path):
+    p = tmp_path / "cookies.txt"
+    p.write_text(
+        "# Netscape HTTP Cookie File\n"
+        "#HttpOnly_.bilibili.com\tTRUE\t/\tTRUE\t0\tSESSDATA\tsecret\n"
+        ".bilibili.com\tTRUE\t/\tFALSE\t0\tbuvid3\tabc\n"
+    )
+    return p
+
+
+def test_apply_cookies_injected_for_matching_domain(tmp_path):
+    """B 站 URL 应注入 B 站 cookie。"""
+    cookies = _write_bilibili_cookies(tmp_path)
+    opts = _apply_cookies({}, "https://www.bilibili.com/video/BV1x/", cookies)
+    assert opts.get("cookiefile") == str(cookies)
+
+
+def test_apply_cookies_skipped_for_other_domain(tmp_path):
+    """回归：B 站 cookie 绝不能漏给 YouTube（否则媒体请求 403）。"""
+    cookies = _write_bilibili_cookies(tmp_path)
+    opts = _apply_cookies({}, "https://www.youtube.com/watch?v=abc", cookies)
+    assert "cookiefile" not in opts
+
+
+def test_apply_cookies_skipped_when_file_missing(tmp_path):
+    opts = _apply_cookies({}, "https://www.bilibili.com/video/BV1x/", tmp_path / "nope.txt")
+    assert "cookiefile" not in opts
+
+
+def test_apply_cookies_noop_when_unconfigured():
+    opts = _apply_cookies({}, "https://www.bilibili.com/video/BV1x/", None)
+    assert "cookiefile" not in opts
 
 
 def _load_fixture(fixtures_dir, name):

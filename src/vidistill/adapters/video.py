@@ -3,6 +3,7 @@ import re
 import subprocess
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlsplit
 
 import yt_dlp
 from yt_dlp.utils import DownloadError
@@ -15,16 +16,44 @@ logger = logging.getLogger(__name__)
 _ANSI_ESCAPE = re.compile(r"\x1b\[\d+(?:;\d+)*m")
 
 
-def _apply_cookies(opts: dict, cookies_file: Optional[Path]) -> dict:
-    """若配置了 cookies 文件且存在，则注入 yt-dlp 的 cookiefile 选项。
+def _cookie_domains(cookies_file: Path) -> set[str]:
+    """读出 Netscape cookies.txt 覆盖的域名集合（去掉前导点）。解析失败返回空集。"""
+    domains: set[str] = set()
+    try:
+        with open(cookies_file, encoding="utf-8") as f:
+            for raw in f:
+                line = raw.strip()
+                if not line:
+                    continue
+                # Netscape 格式注释以 # 开头；但 #HttpOnly_ 是带前缀的真数据行
+                if line.startswith("#HttpOnly_"):
+                    line = line[len("#HttpOnly_"):]
+                elif line.startswith("#"):
+                    continue
+                domain = line.split("\t", 1)[0].strip()
+                if domain:
+                    domains.add(domain.lstrip(".").lower())
+    except OSError:
+        pass
+    return domains
 
-    文件缺失时只记一条警告并跳过（fail-open）：不带 cookie 仍能服务 YouTube 等
-    不需要登录态的站点，避免一个配错的路径让所有抓取直接崩。
+
+def _apply_cookies(opts: dict, url: str, cookies_file: Optional[Path]) -> dict:
+    """仅当 url 的域名属于该 cookies 文件时，才注入 yt-dlp 的 cookiefile。
+
+    cookie 按站点隔离：把 B 站 cookie 传给 YouTube 会让 yt-dlp 的媒体请求被
+    googlevideo CDN 拒绝（HTTP 403），所以只给 cookie 所属站点用。文件缺失只记
+    警告并跳过（fail-open），避免一个配错的路径让所有抓取直接崩。
     """
     if not cookies_file:
         return opts
     if not Path(cookies_file).exists():
-        logger.warning("YTDLP_COOKIES 指向的文件不存在，忽略：%s", cookies_file)
+        logger.warning("cookies 文件不存在，忽略：%s", cookies_file)
+        return opts
+    host = (urlsplit(url).hostname or "").lower()
+    domains = _cookie_domains(Path(cookies_file))
+    if not any(host == d or host.endswith("." + d) for d in domains):
+        logger.info("cookies 文件不含 %s 的域，跳过（仅对其所属站点生效）", host or url)
         return opts
     opts["cookiefile"] = str(cookies_file)
     return opts
@@ -86,7 +115,7 @@ def fetch_metadata(url: str, cookies_file: Optional[Path] = None) -> VideoMetada
         # 否则 extract_info 会枚举全部分 P（极慢），且播放列表 duration 为空会绕过时长上限。
         "noplaylist": True,
     }
-    _apply_cookies(opts, cookies_file)
+    _apply_cookies(opts, url, cookies_file)
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -117,7 +146,7 @@ def fetch_subtitle(url: str, work_dir: Path, cookies_file: Optional[Path] = None
         "subtitlesformat": "vtt",
         "outtmpl": str(work_dir / "%(id)s.%(ext)s"),
     }
-    _apply_cookies(opts, cookies_file)
+    _apply_cookies(opts, url, cookies_file)
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -180,7 +209,7 @@ def download_audio(url: str, work_dir: Path, cookies_file: Optional[Path] = None
             }
         ],
     }
-    _apply_cookies(opts, cookies_file)
+    _apply_cookies(opts, url, cookies_file)
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
